@@ -4,6 +4,7 @@ import {
   Blocks,
   Cable,
   Cpu,
+  Bot,
   Gauge,
   History,
   Settings,
@@ -370,6 +371,7 @@ const ORGANIZATION_SECTIONS: readonly SectionDestination[] = [
   { section: "triggers", label: "Triggers", icon: Zap, subtree: true },
   { section: "activity", label: "Activity", icon: History },
   { section: "daemons", label: "Daemons", icon: Cpu },
+  { section: "providers", label: "Providers", icon: Bot },
   { section: "connections", label: "Connections", icon: Cable },
   { section: "settings", label: "Settings", icon: Settings, subtree: true },
 ];

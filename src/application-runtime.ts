@@ -28,6 +28,7 @@ import { CompositionResources } from "./composition-resources.js";
 import { TriggerDashboard } from "./triggers/dashboard.js";
 import type { ProviderApplications } from "./provider-applications/index.js";
 import { DaemonProviderCatalog } from "./daemons/provider-catalog.js";
+import type { ProviderSubscriptions } from "./provider-subscriptions/service.js";
 
 export interface ApplicationCompositionOptions {
   database: Database | null;
@@ -38,6 +39,7 @@ export interface ApplicationCompositionOptions {
   billing: BillingRuntime | null;
   registrations?: readonly ProviderRegistration[];
   providerApplications?: ProviderApplications;
+  providerSubscriptions?: ProviderSubscriptions;
   publicBaseUrl?: string;
   completionTokenSecret?: string;
   testTriggerRoutes?: boolean;
@@ -137,6 +139,7 @@ async function createOwnedApplicationRuntime(
     resources,
     billing: options.billing,
     providerApplications: providerApplicationsFor(options),
+    providerSubscriptions: options.providerSubscriptions,
     projectDashboard:
       options.database === null || options.auth === null
         ? null

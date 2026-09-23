@@ -17,6 +17,7 @@ import type { PublicApi } from "../public-api/index.js";
 import type { UsageDashboard } from "../usage/dashboard.js";
 import type { ProviderApplications } from "../provider-applications/index.js";
 import type { DaemonProviderCatalog } from "../daemons/provider-catalog.js";
+import type { ProviderSubscriptions } from "../provider-subscriptions/service.js";
 
 /**
  * The public plan catalog shape is billing's own: `src/billing/public-catalog.ts` decides which
@@ -85,6 +86,7 @@ export interface ApplicationRuntime {
    * server-side guard refuses non-operators regardless of this being wired. */
   operatorConsole: OperatorConsole | null;
   providerApplications: ProviderApplications | null;
+  providerSubscriptions?: ProviderSubscriptions | null | undefined;
   testTriggerRoutes: boolean;
   auth(request: Request): Promise<Response>;
   browserAccount?(request: Request): Promise<Response>;

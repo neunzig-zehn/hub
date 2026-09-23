@@ -25,8 +25,11 @@ import { Route as ShellOperatorRouteImport } from './routes/_shell/operator'
 import { Route as ShellConnectionsRouteImport } from './routes/_shell/connections'
 import { Route as ShellCliLoginRouteImport } from './routes/_shell/cli-login'
 import { Route as ShellAppsRouteImport } from './routes/_shell/apps'
+import { Route as ApiProviderSubscriptionsIndexRouteImport } from './routes/api/provider-subscriptions/index'
 import { Route as ApiV1CliAuthorizationsRouteImport } from './routes/api/v1/cli-authorizations'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
+import { Route as ApiProviderSubscriptionsTokenRouteImport } from './routes/api/provider-subscriptions/token'
+import { Route as ApiProviderSubscriptionsPluginRouteImport } from './routes/api/provider-subscriptions/plugin'
 import { Route as ApiDaemonsEnrollRouteImport } from './routes/api/daemons/enroll'
 import { Route as ApiDaemonsDaemonIdRouteImport } from './routes/api/daemons/$daemonId'
 import { Route as ApiBillingWebhookRouteImport } from './routes/api/billing/webhook'
@@ -35,6 +38,7 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AgentSessionsSessionIdMcpRouteImport } from './routes/agent-sessions/$sessionId/mcp'
 import { Route as AgentExecutionsExecutionIdMcpRouteImport } from './routes/agent-executions/$executionId/mcp'
 import { Route as ApiV1CliAuthorizationsPollRouteImport } from './routes/api/v1/cli-authorizations/poll'
+import { Route as ApiProviderSubscriptionsPluginSubscriptionIdRouteImport } from './routes/api/provider-subscriptions/plugin/$subscriptionId'
 import { Route as ApiIntegrationsSlackEventsRouteImport } from './routes/api/integrations/slack/events'
 import { Route as ApiIntegrationsSlackCallbackRouteImport } from './routes/api/integrations/slack/callback'
 import { Route as ApiIntegrationsLinearEventsRouteImport } from './routes/api/integrations/linear/events'
@@ -45,6 +49,7 @@ import { Route as ApiIntegrationsDiscordCallbackRouteImport } from './routes/api
 import { Route as AgentExecutionsExecutionIdAttachmentsAttachmentIdRouteImport } from './routes/agent-executions/$executionId/attachments/$attachmentId'
 import { Route as ShellOOrganizationSlugTriggersRouteImport } from './routes/_shell/o/$organizationSlug/triggers'
 import { Route as ShellOOrganizationSlugSettingsRouteImport } from './routes/_shell/o/$organizationSlug/settings'
+import { Route as ShellOOrganizationSlugProvidersRouteImport } from './routes/_shell/o/$organizationSlug/providers'
 import { Route as ShellOOrganizationSlugDaemonsRouteImport } from './routes/_shell/o/$organizationSlug/daemons'
 import { Route as ShellOOrganizationSlugConnectionsRouteImport } from './routes/_shell/o/$organizationSlug/connections'
 import { Route as ShellOOrganizationSlugActivityRouteImport } from './routes/_shell/o/$organizationSlug/activity'
@@ -135,6 +140,12 @@ const ShellAppsRoute = ShellAppsRouteImport.update({
   path: '/apps',
   getParentRoute: () => ShellRoute,
 } as any)
+const ApiProviderSubscriptionsIndexRoute =
+  ApiProviderSubscriptionsIndexRouteImport.update({
+    id: '/api/provider-subscriptions/',
+    path: '/api/provider-subscriptions/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiV1CliAuthorizationsRoute = ApiV1CliAuthorizationsRouteImport.update({
   id: '/api/v1/cli-authorizations',
   path: '/api/v1/cli-authorizations',
@@ -145,6 +156,18 @@ const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
   path: '/api/v1/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProviderSubscriptionsTokenRoute =
+  ApiProviderSubscriptionsTokenRouteImport.update({
+    id: '/api/provider-subscriptions/token',
+    path: '/api/provider-subscriptions/token',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiProviderSubscriptionsPluginRoute =
+  ApiProviderSubscriptionsPluginRouteImport.update({
+    id: '/api/provider-subscriptions/plugin',
+    path: '/api/provider-subscriptions/plugin',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDaemonsEnrollRoute = ApiDaemonsEnrollRouteImport.update({
   id: '/api/daemons/enroll',
   path: '/api/daemons/enroll',
@@ -187,6 +210,12 @@ const ApiV1CliAuthorizationsPollRoute =
     id: '/poll',
     path: '/poll',
     getParentRoute: () => ApiV1CliAuthorizationsRoute,
+  } as any)
+const ApiProviderSubscriptionsPluginSubscriptionIdRoute =
+  ApiProviderSubscriptionsPluginSubscriptionIdRouteImport.update({
+    id: '/$subscriptionId',
+    path: '/$subscriptionId',
+    getParentRoute: () => ApiProviderSubscriptionsPluginRoute,
   } as any)
 const ApiIntegrationsSlackEventsRoute =
   ApiIntegrationsSlackEventsRouteImport.update({
@@ -246,6 +275,12 @@ const ShellOOrganizationSlugSettingsRoute =
   ShellOOrganizationSlugSettingsRouteImport.update({
     id: '/o/$organizationSlug/settings',
     path: '/o/$organizationSlug/settings',
+    getParentRoute: () => ShellRoute,
+  } as any)
+const ShellOOrganizationSlugProvidersRoute =
+  ShellOOrganizationSlugProvidersRouteImport.update({
+    id: '/o/$organizationSlug/providers',
+    path: '/o/$organizationSlug/providers',
     getParentRoute: () => ShellRoute,
   } as any)
 const ShellOOrganizationSlugDaemonsRoute =
@@ -332,11 +367,15 @@ export interface FileRoutesByFullPath {
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
+  '/api/provider-subscriptions/plugin': typeof ApiProviderSubscriptionsPluginRouteWithChildren
+  '/api/provider-subscriptions/token': typeof ApiProviderSubscriptionsTokenRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/api/v1/cli-authorizations': typeof ApiV1CliAuthorizationsRouteWithChildren
+  '/api/provider-subscriptions/': typeof ApiProviderSubscriptionsIndexRoute
   '/o/$organizationSlug/activity': typeof ShellOOrganizationSlugActivityRoute
   '/o/$organizationSlug/connections': typeof ShellOOrganizationSlugConnectionsRoute
   '/o/$organizationSlug/daemons': typeof ShellOOrganizationSlugDaemonsRoute
+  '/o/$organizationSlug/providers': typeof ShellOOrganizationSlugProvidersRoute
   '/o/$organizationSlug/settings': typeof ShellOOrganizationSlugSettingsRouteWithChildren
   '/o/$organizationSlug/triggers': typeof ShellOOrganizationSlugTriggersRouteWithChildren
   '/agent-executions/$executionId/attachments/$attachmentId': typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
@@ -347,6 +386,7 @@ export interface FileRoutesByFullPath {
   '/api/integrations/linear/events': typeof ApiIntegrationsLinearEventsRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/provider-subscriptions/plugin/$subscriptionId': typeof ApiProviderSubscriptionsPluginSubscriptionIdRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/o/$organizationSlug/settings/api-keys': typeof ShellOOrganizationSlugSettingsApiKeysRoute
   '/o/$organizationSlug/settings/billing': typeof ShellOOrganizationSlugSettingsBillingRoute
@@ -379,11 +419,15 @@ export interface FileRoutesByTo {
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
+  '/api/provider-subscriptions/plugin': typeof ApiProviderSubscriptionsPluginRouteWithChildren
+  '/api/provider-subscriptions/token': typeof ApiProviderSubscriptionsTokenRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/api/v1/cli-authorizations': typeof ApiV1CliAuthorizationsRouteWithChildren
+  '/api/provider-subscriptions': typeof ApiProviderSubscriptionsIndexRoute
   '/o/$organizationSlug/activity': typeof ShellOOrganizationSlugActivityRoute
   '/o/$organizationSlug/connections': typeof ShellOOrganizationSlugConnectionsRoute
   '/o/$organizationSlug/daemons': typeof ShellOOrganizationSlugDaemonsRoute
+  '/o/$organizationSlug/providers': typeof ShellOOrganizationSlugProvidersRoute
   '/agent-executions/$executionId/attachments/$attachmentId': typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
   '/api/integrations/discord/callback': typeof ApiIntegrationsDiscordCallbackRoute
   '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
@@ -392,6 +436,7 @@ export interface FileRoutesByTo {
   '/api/integrations/linear/events': typeof ApiIntegrationsLinearEventsRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/provider-subscriptions/plugin/$subscriptionId': typeof ApiProviderSubscriptionsPluginSubscriptionIdRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/o/$organizationSlug/settings/api-keys': typeof ShellOOrganizationSlugSettingsApiKeysRoute
   '/o/$organizationSlug/settings/billing': typeof ShellOOrganizationSlugSettingsBillingRoute
@@ -426,11 +471,15 @@ export interface FileRoutesById {
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
+  '/api/provider-subscriptions/plugin': typeof ApiProviderSubscriptionsPluginRouteWithChildren
+  '/api/provider-subscriptions/token': typeof ApiProviderSubscriptionsTokenRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/api/v1/cli-authorizations': typeof ApiV1CliAuthorizationsRouteWithChildren
+  '/api/provider-subscriptions/': typeof ApiProviderSubscriptionsIndexRoute
   '/_shell/o/$organizationSlug/activity': typeof ShellOOrganizationSlugActivityRoute
   '/_shell/o/$organizationSlug/connections': typeof ShellOOrganizationSlugConnectionsRoute
   '/_shell/o/$organizationSlug/daemons': typeof ShellOOrganizationSlugDaemonsRoute
+  '/_shell/o/$organizationSlug/providers': typeof ShellOOrganizationSlugProvidersRoute
   '/_shell/o/$organizationSlug/settings': typeof ShellOOrganizationSlugSettingsRouteWithChildren
   '/_shell/o/$organizationSlug/triggers': typeof ShellOOrganizationSlugTriggersRouteWithChildren
   '/agent-executions/$executionId/attachments/$attachmentId': typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
@@ -441,6 +490,7 @@ export interface FileRoutesById {
   '/api/integrations/linear/events': typeof ApiIntegrationsLinearEventsRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/provider-subscriptions/plugin/$subscriptionId': typeof ApiProviderSubscriptionsPluginSubscriptionIdRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/_shell/o/$organizationSlug/settings/api-keys': typeof ShellOOrganizationSlugSettingsApiKeysRoute
   '/_shell/o/$organizationSlug/settings/billing': typeof ShellOOrganizationSlugSettingsBillingRoute
@@ -475,11 +525,15 @@ export interface FileRouteTypes {
     | '/api/billing/webhook'
     | '/api/daemons/$daemonId'
     | '/api/daemons/enroll'
+    | '/api/provider-subscriptions/plugin'
+    | '/api/provider-subscriptions/token'
     | '/api/v1/$'
     | '/api/v1/cli-authorizations'
+    | '/api/provider-subscriptions/'
     | '/o/$organizationSlug/activity'
     | '/o/$organizationSlug/connections'
     | '/o/$organizationSlug/daemons'
+    | '/o/$organizationSlug/providers'
     | '/o/$organizationSlug/settings'
     | '/o/$organizationSlug/triggers'
     | '/agent-executions/$executionId/attachments/$attachmentId'
@@ -490,6 +544,7 @@ export interface FileRouteTypes {
     | '/api/integrations/linear/events'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/provider-subscriptions/plugin/$subscriptionId'
     | '/api/v1/cli-authorizations/poll'
     | '/o/$organizationSlug/settings/api-keys'
     | '/o/$organizationSlug/settings/billing'
@@ -522,11 +577,15 @@ export interface FileRouteTypes {
     | '/api/billing/webhook'
     | '/api/daemons/$daemonId'
     | '/api/daemons/enroll'
+    | '/api/provider-subscriptions/plugin'
+    | '/api/provider-subscriptions/token'
     | '/api/v1/$'
     | '/api/v1/cli-authorizations'
+    | '/api/provider-subscriptions'
     | '/o/$organizationSlug/activity'
     | '/o/$organizationSlug/connections'
     | '/o/$organizationSlug/daemons'
+    | '/o/$organizationSlug/providers'
     | '/agent-executions/$executionId/attachments/$attachmentId'
     | '/api/integrations/discord/callback'
     | '/api/integrations/github/callback'
@@ -535,6 +594,7 @@ export interface FileRouteTypes {
     | '/api/integrations/linear/events'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/provider-subscriptions/plugin/$subscriptionId'
     | '/api/v1/cli-authorizations/poll'
     | '/o/$organizationSlug/settings/api-keys'
     | '/o/$organizationSlug/settings/billing'
@@ -568,11 +628,15 @@ export interface FileRouteTypes {
     | '/api/billing/webhook'
     | '/api/daemons/$daemonId'
     | '/api/daemons/enroll'
+    | '/api/provider-subscriptions/plugin'
+    | '/api/provider-subscriptions/token'
     | '/api/v1/$'
     | '/api/v1/cli-authorizations'
+    | '/api/provider-subscriptions/'
     | '/_shell/o/$organizationSlug/activity'
     | '/_shell/o/$organizationSlug/connections'
     | '/_shell/o/$organizationSlug/daemons'
+    | '/_shell/o/$organizationSlug/providers'
     | '/_shell/o/$organizationSlug/settings'
     | '/_shell/o/$organizationSlug/triggers'
     | '/agent-executions/$executionId/attachments/$attachmentId'
@@ -583,6 +647,7 @@ export interface FileRouteTypes {
     | '/api/integrations/linear/events'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/provider-subscriptions/plugin/$subscriptionId'
     | '/api/v1/cli-authorizations/poll'
     | '/_shell/o/$organizationSlug/settings/api-keys'
     | '/_shell/o/$organizationSlug/settings/billing'
@@ -611,8 +676,11 @@ export interface RootRouteChildren {
   ApiBillingWebhookRoute: typeof ApiBillingWebhookRoute
   ApiDaemonsDaemonIdRoute: typeof ApiDaemonsDaemonIdRoute
   ApiDaemonsEnrollRoute: typeof ApiDaemonsEnrollRoute
+  ApiProviderSubscriptionsPluginRoute: typeof ApiProviderSubscriptionsPluginRouteWithChildren
+  ApiProviderSubscriptionsTokenRoute: typeof ApiProviderSubscriptionsTokenRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
   ApiV1CliAuthorizationsRoute: typeof ApiV1CliAuthorizationsRouteWithChildren
+  ApiProviderSubscriptionsIndexRoute: typeof ApiProviderSubscriptionsIndexRoute
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute: typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
   ApiIntegrationsDiscordCallbackRoute: typeof ApiIntegrationsDiscordCallbackRoute
   ApiIntegrationsGithubCallbackRoute: typeof ApiIntegrationsGithubCallbackRoute
@@ -737,6 +805,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppsRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/api/provider-subscriptions/': {
+      id: '/api/provider-subscriptions/'
+      path: '/api/provider-subscriptions'
+      fullPath: '/api/provider-subscriptions/'
+      preLoaderRoute: typeof ApiProviderSubscriptionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/cli-authorizations': {
       id: '/api/v1/cli-authorizations'
       path: '/api/v1/cli-authorizations'
@@ -749,6 +824,20 @@ declare module '@tanstack/react-router' {
       path: '/api/v1/$'
       fullPath: '/api/v1/$'
       preLoaderRoute: typeof ApiV1SplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/provider-subscriptions/token': {
+      id: '/api/provider-subscriptions/token'
+      path: '/api/provider-subscriptions/token'
+      fullPath: '/api/provider-subscriptions/token'
+      preLoaderRoute: typeof ApiProviderSubscriptionsTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/provider-subscriptions/plugin': {
+      id: '/api/provider-subscriptions/plugin'
+      path: '/api/provider-subscriptions/plugin'
+      fullPath: '/api/provider-subscriptions/plugin'
+      preLoaderRoute: typeof ApiProviderSubscriptionsPluginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/daemons/enroll': {
@@ -806,6 +895,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/v1/cli-authorizations/poll'
       preLoaderRoute: typeof ApiV1CliAuthorizationsPollRouteImport
       parentRoute: typeof ApiV1CliAuthorizationsRoute
+    }
+    '/api/provider-subscriptions/plugin/$subscriptionId': {
+      id: '/api/provider-subscriptions/plugin/$subscriptionId'
+      path: '/$subscriptionId'
+      fullPath: '/api/provider-subscriptions/plugin/$subscriptionId'
+      preLoaderRoute: typeof ApiProviderSubscriptionsPluginSubscriptionIdRouteImport
+      parentRoute: typeof ApiProviderSubscriptionsPluginRoute
     }
     '/api/integrations/slack/events': {
       id: '/api/integrations/slack/events'
@@ -875,6 +971,13 @@ declare module '@tanstack/react-router' {
       path: '/o/$organizationSlug/settings'
       fullPath: '/o/$organizationSlug/settings'
       preLoaderRoute: typeof ShellOOrganizationSlugSettingsRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/o/$organizationSlug/providers': {
+      id: '/_shell/o/$organizationSlug/providers'
+      path: '/o/$organizationSlug/providers'
+      fullPath: '/o/$organizationSlug/providers'
+      preLoaderRoute: typeof ShellOOrganizationSlugProvidersRouteImport
       parentRoute: typeof ShellRoute
     }
     '/_shell/o/$organizationSlug/daemons': {
@@ -1005,6 +1108,7 @@ interface ShellRouteChildren {
   ShellOOrganizationSlugActivityRoute: typeof ShellOOrganizationSlugActivityRoute
   ShellOOrganizationSlugConnectionsRoute: typeof ShellOOrganizationSlugConnectionsRoute
   ShellOOrganizationSlugDaemonsRoute: typeof ShellOOrganizationSlugDaemonsRoute
+  ShellOOrganizationSlugProvidersRoute: typeof ShellOOrganizationSlugProvidersRoute
   ShellOOrganizationSlugSettingsRoute: typeof ShellOOrganizationSlugSettingsRouteWithChildren
   ShellOOrganizationSlugTriggersRoute: typeof ShellOOrganizationSlugTriggersRouteWithChildren
 }
@@ -1020,6 +1124,7 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellOOrganizationSlugConnectionsRoute:
     ShellOOrganizationSlugConnectionsRoute,
   ShellOOrganizationSlugDaemonsRoute: ShellOOrganizationSlugDaemonsRoute,
+  ShellOOrganizationSlugProvidersRoute: ShellOOrganizationSlugProvidersRoute,
   ShellOOrganizationSlugSettingsRoute:
     ShellOOrganizationSlugSettingsRouteWithChildren,
   ShellOOrganizationSlugTriggersRoute:
@@ -1027,6 +1132,21 @@ const ShellRouteChildren: ShellRouteChildren = {
 }
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
+
+interface ApiProviderSubscriptionsPluginRouteChildren {
+  ApiProviderSubscriptionsPluginSubscriptionIdRoute: typeof ApiProviderSubscriptionsPluginSubscriptionIdRoute
+}
+
+const ApiProviderSubscriptionsPluginRouteChildren: ApiProviderSubscriptionsPluginRouteChildren =
+  {
+    ApiProviderSubscriptionsPluginSubscriptionIdRoute:
+      ApiProviderSubscriptionsPluginSubscriptionIdRoute,
+  }
+
+const ApiProviderSubscriptionsPluginRouteWithChildren =
+  ApiProviderSubscriptionsPluginRoute._addFileChildren(
+    ApiProviderSubscriptionsPluginRouteChildren,
+  )
 
 interface ApiV1CliAuthorizationsRouteChildren {
   ApiV1CliAuthorizationsPollRoute: typeof ApiV1CliAuthorizationsPollRoute
@@ -1060,8 +1180,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBillingWebhookRoute: ApiBillingWebhookRoute,
   ApiDaemonsDaemonIdRoute: ApiDaemonsDaemonIdRoute,
   ApiDaemonsEnrollRoute: ApiDaemonsEnrollRoute,
+  ApiProviderSubscriptionsPluginRoute:
+    ApiProviderSubscriptionsPluginRouteWithChildren,
+  ApiProviderSubscriptionsTokenRoute: ApiProviderSubscriptionsTokenRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
   ApiV1CliAuthorizationsRoute: ApiV1CliAuthorizationsRouteWithChildren,
+  ApiProviderSubscriptionsIndexRoute: ApiProviderSubscriptionsIndexRoute,
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute:
     AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute,
   ApiIntegrationsDiscordCallbackRoute: ApiIntegrationsDiscordCallbackRoute,

@@ -48,6 +48,7 @@ import { createInvitationMailer } from "./invitations/index.js";
 import { composeEmailDelivery } from "./email/index.js";
 import { createAccountMailer } from "./auth/account-emails.js";
 import { migrateLegacyProjectTriggers } from "./triggers/migration.js";
+import { ProviderSubscriptions } from "./provider-subscriptions/service.js";
 
 export function startProductionRuntime(): Promise<ApplicationRuntime> {
   return startApplication(createProductionRuntime);
@@ -155,6 +156,7 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
     const application = await createApplicationRuntime({
       database,
       auth,
+      providerSubscriptions: new ProviderSubscriptions(runtime, auth, identity.authSecret),
       entitlements: entitlements.service,
       billing,
       registrations: providerRuntime.registrations(),

@@ -687,6 +687,46 @@ export const organizationCliCredentials = pgTable(
   ],
 );
 
+/** Workspace subscriptions are encrypted before they reach the database. */
+export const providerSubscriptions = pgTable(
+  "provider_subscriptions",
+  {
+    id: uuid().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    family: text().$type<"codex" | "claude">().notNull(),
+    label: text().notNull(),
+    encryptedCredential: text("encrypted_credential").notNull(),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("provider_subscriptions_organization_idx").on(table.organizationId),
+    check("provider_subscriptions_family_check", sql`${table.family} in ('codex', 'claude')`),
+  ],
+);
+
+/** A Google-authenticated member issues one scoped key to a personal daemon. */
+export const providerPluginTokens = pgTable(
+  "provider_plugin_tokens",
+  {
+    id: uuid().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    verifier: text().notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => [index("provider_plugin_tokens_user_idx").on(table.userId, table.createdAt.desc())],
+);
+
 export const agentSessions = pgTable(
   "agent_sessions",
   {

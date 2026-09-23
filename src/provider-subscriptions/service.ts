@@ -5,6 +5,7 @@ import { ProductRequestError } from "../auth/organization-access.js";
 import type { DatabaseRuntime, QueryRow } from "../db/runtime/index.js";
 import { INTERNAL_CLIENT_ADDRESS_HEADER } from "../http/client-address.js";
 import { decryptCredential, encryptCredential, providerCredentialKey } from "./crypto.js";
+import { fetchProviderUsage, type ProviderUsage } from "./usage.js";
 
 const subscriptionInput = z.object({
   family: z.enum(["codex", "claude"]),
@@ -13,7 +14,10 @@ const subscriptionInput = z.object({
 });
 const idInput = z.object({ id: z.string().uuid() });
 const deviceInput = z.object({ deviceCode: z.string().min(32).max(100) });
-const decisionInput = z.object({ userCode: z.string().min(1).max(40), decision: z.enum(["approve", "deny"]) });
+const decisionInput = z.object({
+  userCode: z.string().min(1).max(40),
+  decision: z.enum(["approve", "deny"]),
+});
 const DEVICE_LIFETIME_MINUTES = 10;
 
 interface SubscriptionRow extends QueryRow {
@@ -45,6 +49,10 @@ interface DeviceRow extends QueryRow {
 /** Credentials are handed only to a Google-authenticated member or their scoped plugin token. */
 export class ProviderSubscriptions {
   private readonly key: Buffer;
+  private readonly usageCache = new Map<
+    string,
+    { until: number; value: Promise<ProviderUsage | null> }
+  >();
 
   constructor(
     private readonly database: DatabaseRuntime,
@@ -77,9 +85,14 @@ export class ProviderSubscriptions {
             [access.organization.id, access.account.id],
           ),
         ]);
-        return json({ subscriptions, tokens: tokens.rows.map(tokenView), canManage: access.capabilities.manageResources });
+        return json({
+          subscriptions,
+          tokens: tokens.rows.map(tokenView),
+          canManage: access.capabilities.manageResources,
+        });
       }
-      if (request.method !== "POST" && request.method !== "DELETE") return json({ error: "method_not_allowed" }, 405);
+      if (request.method !== "POST" && request.method !== "DELETE")
+        return json({ error: "method_not_allowed" }, 405);
       const rejected = this.auth.rejectCookieMutation(request);
       if (rejected !== undefined) return rejected;
       const body = await boundedJson(request);
@@ -118,13 +131,26 @@ export class ProviderSubscriptions {
            (id, organization_id, family, label, encrypted_credential, created_by_user_id)
          values ($1, $2, $3, $4, $5, $6)
          returning id, organization_id, family, label, encrypted_credential, created_at`,
-        [id, access.organization.id, input.family, input.label,
-          encryptCredential(this.key, { organizationId: access.organization.id, id, family: input.family }, credential),
-          access.account.id],
+        [
+          id,
+          access.organization.id,
+          input.family,
+          input.label,
+          encryptCredential(
+            this.key,
+            { organizationId: access.organization.id, id, family: input.family },
+            credential,
+          ),
+          access.account.id,
+        ],
       );
       return json({ subscription: subscriptionView(result.rows[0]!) }, 201);
     } catch (error) {
-      if (error instanceof z.ZodError || error instanceof SyntaxError || error instanceof RangeError) {
+      if (
+        error instanceof z.ZodError ||
+        error instanceof SyntaxError ||
+        error instanceof RangeError
+      ) {
         return json({ error: "invalid_request" }, 400);
       }
       throw error;
@@ -132,7 +158,9 @@ export class ProviderSubscriptions {
   }
 
   async plugin(request: Request, id?: string): Promise<Response> {
-    const bearer = /^Bearer (paseo_plugin_[A-Za-z0-9_-]{43})$/u.exec(request.headers.get("authorization") ?? "")?.[1];
+    const bearer = /^Bearer (paseo_plugin_[A-Za-z0-9_-]{43})$/u.exec(
+      request.headers.get("authorization") ?? "",
+    )?.[1];
     if (bearer === undefined) return json({ error: "unauthorized" }, 401);
     const authorized = await this.database.query<{ organization_id: string }>(
       `select token.organization_id from provider_plugin_tokens token
@@ -152,15 +180,27 @@ export class ProviderSubscriptions {
     );
     const row = result.rows[0];
     if (row === undefined) return json({ error: "not_found" }, 404);
-    return json({ ...subscriptionView(row), credential: decryptCredential(this.key, {
-      organizationId: row.organization_id, id: row.id, family: row.family,
-    }, row.encrypted_credential) });
+    return json({
+      ...subscriptionView(row),
+      credential: decryptCredential(
+        this.key,
+        {
+          organizationId: row.organization_id,
+          id: row.id,
+          family: row.family,
+        },
+        row.encrypted_credential,
+      ),
+    });
   }
 
   async deviceStart(request: Request): Promise<Response> {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
     const deviceCode = randomBytes(32).toString("base64url");
-    const userCode = randomBytes(8).toString("hex").toUpperCase().replace(/(.{4})(?=.)/gu, "$1-");
+    const userCode = randomBytes(8)
+      .toString("hex")
+      .toUpperCase()
+      .replace(/(.{4})(?=.)/gu, "$1-");
     const fingerprint = hash(request.headers.get(INTERNAL_CLIENT_ADDRESS_HEADER) ?? "unknown");
     const created = await this.database.transaction(async (tx) => {
       // ponytail: approximate capacity cap; use an advisory lock if concurrent abuse appears.
@@ -183,8 +223,16 @@ export class ProviderSubscriptions {
     if (!created) return json({ error: "retry_later", interval: 5 }, 429);
     const verificationUriComplete = new URL("/plugin-login", this.publicBaseUrl ?? request.url);
     verificationUriComplete.searchParams.set("code", userCode);
-    return json({ deviceCode, userCode, verificationUriComplete: verificationUriComplete.toString(),
-      interval: 5, expiresIn: DEVICE_LIFETIME_MINUTES * 60 }, 201);
+    return json(
+      {
+        deviceCode,
+        userCode,
+        verificationUriComplete: verificationUriComplete.toString(),
+        interval: 5,
+        expiresIn: DEVICE_LIFETIME_MINUTES * 60,
+      },
+      201,
+    );
   }
 
   async deviceDecide(request: Request): Promise<Response> {
@@ -198,9 +246,11 @@ export class ProviderSubscriptions {
       throw error;
     }
     let input: unknown;
-    try { input = await boundedJson(request); }
-    catch (error) {
-      if (error instanceof SyntaxError || error instanceof RangeError) return json({ error: "invalid_request" }, 400);
+    try {
+      input = await boundedJson(request);
+    } catch (error) {
+      if (error instanceof SyntaxError || error instanceof RangeError)
+        return json({ error: "invalid_request" }, 400);
       throw error;
     }
     const body = decisionInput.safeParse(input);
@@ -212,7 +262,8 @@ export class ProviderSubscriptions {
         [hash(normalizeCode(body.data.userCode))],
       );
       const row = selected.rows[0];
-      if (row === undefined || row.status !== "pending" || row.expires_at <= row.database_now) return "unavailable";
+      if (row === undefined || row.status !== "pending" || row.expires_at <= row.database_now)
+        return "unavailable";
       const authority = await tx.query(
         `select 1 from session join member on member.id = $3
            and member.user_id = session.user_id and member.organization_id = session.active_organization_id
@@ -228,7 +279,12 @@ export class ProviderSubscriptions {
            organization_id = case when $2 = 'approved' then $3 else null end,
            user_id = case when $2 = 'approved' then $4 else null end
          where id = $1`,
-        [row.id, body.data.decision === "approve" ? "approved" : "denied", access.organization.id, access.account.id],
+        [
+          row.id,
+          body.data.decision === "approve" ? "approved" : "denied",
+          access.organization.id,
+          access.account.id,
+        ],
       );
       return body.data.decision === "approve" ? "approved" : "denied";
     });
@@ -239,9 +295,11 @@ export class ProviderSubscriptions {
 
   async devicePoll(request: Request): Promise<Response> {
     let input: unknown;
-    try { input = await boundedJson(request); }
-    catch (error) {
-      if (error instanceof SyntaxError || error instanceof RangeError) return json({ error: "invalid_request" }, 400);
+    try {
+      input = await boundedJson(request);
+    } catch (error) {
+      if (error instanceof SyntaxError || error instanceof RangeError)
+        return json({ error: "invalid_request" }, 400);
       throw error;
     }
     const body = deviceInput.safeParse(input);
@@ -269,14 +327,18 @@ export class ProviderSubscriptions {
         `update provider_device_authorizations set next_poll_at = now() + (poll_interval_seconds * interval '1 second') where id = $1`,
         [row.id],
       );
-      if (row.status !== "approved") return { status: "pending", interval: row.poll_interval_seconds };
+      if (row.status !== "approved")
+        return { status: "pending", interval: row.poll_interval_seconds };
       const membership = await tx.query(
         `select 1 from member where organization_id = $1 and user_id = $2
            and role in ('owner', 'admin', 'member') for update`,
         [row.organization_id, row.user_id],
       );
       if (membership.rowCount !== 1) {
-        await tx.query(`update provider_device_authorizations set status = 'denied' where id = $1`, [row.id]);
+        await tx.query(
+          `update provider_device_authorizations set status = 'denied' where id = $1`,
+          [row.id],
+        );
         return { status: "denied" };
       }
       await tx.query(
@@ -284,7 +346,10 @@ export class ProviderSubscriptions {
          values ($1, $2, $3, $4)`,
         [randomUUID(), row.organization_id, row.user_id, hash(credential)],
       );
-      await tx.query(`update provider_device_authorizations set status = 'disclosed' where id = $1`, [row.id]);
+      await tx.query(
+        `update provider_device_authorizations set status = 'disclosed' where id = $1`,
+        [row.id],
+      );
       return { status: "authorized", credential };
     });
     return json(outcome);
@@ -296,36 +361,73 @@ export class ProviderSubscriptions {
        from provider_subscriptions where organization_id = $1 order by created_at desc`,
       [organizationId],
     );
-    return result.rows.map(subscriptionView);
+    return Promise.all(
+      result.rows.map(async (row) =>
+        Object.assign(subscriptionView(row), { usage: await this.usageFor(row) }),
+      ),
+    );
+  }
+
+  private usageFor(row: SubscriptionRow): Promise<ProviderUsage | null> {
+    const now = Date.now();
+    const cached = this.usageCache.get(row.id);
+    if (cached && cached.until > now) return cached.value;
+    if (this.usageCache.size > 500) this.usageCache.clear();
+    const credential = decryptCredential(
+      this.key,
+      {
+        organizationId: row.organization_id,
+        id: row.id,
+        family: row.family,
+      },
+      row.encrypted_credential,
+    );
+    const value = fetchProviderUsage(row.family, credential).catch(() => null);
+    this.usageCache.set(row.id, { until: now + 5 * 60_000, value });
+    return value;
   }
 }
 
 function validateCredential(family: "codex" | "claude", value: string): string {
   if (family === "claude") {
-    if (!/^sk-ant-[A-Za-z0-9_-]+$/u.test(value.trim())) throw new SyntaxError("Invalid Claude setup token");
+    if (!/^sk-ant-[A-Za-z0-9_-]+$/u.test(value.trim()))
+      throw new SyntaxError("Invalid Claude setup token");
     return value.trim();
   }
   const parsed: unknown = JSON.parse(value);
-  const credential = z.object({
-    auth_mode: z.literal("chatgpt"),
-    tokens: z.object({ refresh_token: z.string().min(1) }).passthrough(),
-  }).passthrough().parse(parsed);
+  const credential = z
+    .object({
+      auth_mode: z.literal("chatgpt"),
+      tokens: z.object({ refresh_token: z.string().min(1) }).passthrough(),
+    })
+    .passthrough()
+    .parse(parsed);
   return JSON.stringify(credential);
 }
 
 async function boundedJson(request: Request): Promise<unknown> {
-  if (Number(request.headers.get("content-length") ?? 0) > 110_000) throw new RangeError("Request too large");
+  if (Number(request.headers.get("content-length") ?? 0) > 110_000)
+    throw new RangeError("Request too large");
   const text = await request.text();
   if (text.length > 110_000) throw new RangeError("Request too large");
   return JSON.parse(text);
 }
 
 function subscriptionView(row: SubscriptionRow) {
-  return { id: row.id, family: row.family, label: row.label, createdAt: row.created_at.toISOString() };
+  return {
+    id: row.id,
+    family: row.family,
+    label: row.label,
+    createdAt: row.created_at.toISOString(),
+  };
 }
 
 function tokenView(row: TokenRow) {
-  return { id: row.id, createdAt: row.created_at.toISOString(), revokedAt: row.revoked_at?.toISOString() ?? null };
+  return {
+    id: row.id,
+    createdAt: row.created_at.toISOString(),
+    revokedAt: row.revoked_at?.toISOString() ?? null,
+  };
 }
 
 function hash(value: string): string {
@@ -333,7 +435,10 @@ function hash(value: string): string {
 }
 
 function normalizeCode(value: string): string {
-  return value.normalize("NFKC").toUpperCase().replace(/[^A-F0-9]/gu, "");
+  return value
+    .normalize("NFKC")
+    .toUpperCase()
+    .replace(/[^A-F0-9]/gu, "");
 }
 
 function json(body: unknown, status = 200): Response {

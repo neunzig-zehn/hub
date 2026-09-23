@@ -6,17 +6,39 @@ import { PageHeader } from "../components/app/page.js";
 import { Section } from "../components/app/section.js";
 import { FormField } from "../components/app/form-field.js";
 import { DataCell, DataRow, DataTable } from "../components/app/data-table.js";
+import { TwoLine } from "../components/app/two-line.js";
 import { Button } from "../components/ui/button.js";
 import { Input } from "../components/ui/input.js";
 
+const usageWindow = z.object({ usedPercent: z.number(), resetsAt: z.string().nullable() });
 const snapshotSchema = z.object({
-  subscriptions: z.array(z.object({ id: z.string(), family: z.enum(["codex", "claude"]), label: z.string(), createdAt: z.string() })),
-  tokens: z.array(z.object({ id: z.string(), createdAt: z.string(), revokedAt: z.string().nullable() })),
+  subscriptions: z.array(
+    z.object({
+      id: z.string(),
+      family: z.enum(["codex", "claude"]),
+      label: z.string(),
+      createdAt: z.string(),
+      usage: z
+        .object({
+          fiveHour: usageWindow.nullable(),
+          weekly: usageWindow.nullable(),
+          fable: usageWindow.nullable(),
+          checkedAt: z.string(),
+        })
+        .nullable(),
+    }),
+  ),
+  tokens: z.array(
+    z.object({ id: z.string(), createdAt: z.string(), revokedAt: z.string().nullable() }),
+  ),
   canManage: z.boolean(),
 });
 type Snapshot = z.infer<typeof snapshotSchema>;
-const TABLE_COLUMNS = [{ header: "Name" }, { header: "Provider" }, { header: "" }] as const;
-const EMPTY_TABLE = { title: "No subscriptions", description: "Add a Codex or Claude subscription to offer it to the workspace." };
+const TABLE_COLUMNS = [{ header: "Account" }, { header: "Usage" }, { header: "" }] as const;
+const EMPTY_TABLE = {
+  title: "No subscriptions",
+  description: "Add a Codex or Claude subscription to offer it to the workspace.",
+};
 
 export function ProvidersPage() {
   const { organization } = useRouteTenant();
@@ -37,6 +59,10 @@ export function ProvidersPage() {
   }, [endpoint]);
   useEffect(() => {
     void load().catch((cause: unknown) => setError(message(cause)));
+    const timer = setInterval(() => {
+      void load().catch((cause: unknown) => setError(message(cause)));
+    }, 5 * 60_000);
+    return () => clearInterval(timer);
   }, [load]);
 
   async function send(url: string, method: "POST" | "DELETE", body: unknown) {
@@ -58,7 +84,8 @@ export function ProvidersPage() {
     setError(undefined);
     try {
       const credential = family === "codex" ? await codexFile?.text() : claudeToken;
-      if (!credential) throw new Error("Choose a Codex auth.json file or enter a Claude setup token.");
+      if (!credential)
+        throw new Error("Choose a Codex auth.json file or enter a Claude setup token.");
       await send(endpoint, "POST", { family, label, credential });
       setLabel("");
       setClaudeToken("");
@@ -100,15 +127,70 @@ export function ProvidersPage() {
 
   return (
     <div>
-      <PageHeader title="Providers" description="Workspace subscriptions for Codex and Claude. Members can use these on connected daemons." />
-      {error && <p role="alert" className="mb-4 text-sm text-destructive">{error}</p>}
-      <Section title="Workspace accounts" description="Only admins can add or remove subscriptions. Credentials are encrypted and never shown again.">
-        <DataTable label="Provider accounts" columns={TABLE_COLUMNS} empty={EMPTY_TABLE} isEmpty={snapshot?.subscriptions.length === 0}>
+      <PageHeader
+        title="Providers"
+        description="Workspace subscriptions for Codex and Claude. Members can use these on connected daemons."
+      />
+      {error && (
+        <p role="alert" className="mb-4 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      <Section
+        title="Workspace accounts"
+        description="Only admins can add or remove subscriptions. Credentials are encrypted. Usage refreshes every five minutes; — means the provider did not report a value."
+      >
+        <DataTable
+          label="Provider accounts"
+          columns={TABLE_COLUMNS}
+          empty={EMPTY_TABLE}
+          isEmpty={snapshot?.subscriptions.length === 0}
+        >
           {snapshot?.subscriptions.map((item) => (
             <DataRow key={item.id}>
-              <DataCell>{item.label}</DataCell>
-              <DataCell>{item.family === "codex" ? "Codex" : "Claude"}</DataCell>
-              <DataCell align="end">{snapshot.canManage && <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void remove(item.id)}>Remove</Button>}</DataCell>
+              <DataCell>
+                <span className="flex items-center gap-3">
+                  {item.family === "codex" ? (
+                    <img
+                      src="/provider-logos/openai-white.svg"
+                      alt=""
+                      className="size-5 shrink-0"
+                    />
+                  ) : (
+                    <img src="/provider-logos/claude.svg" alt="" className="size-5 shrink-0" />
+                  )}
+                  <TwoLine
+                    primary={item.label}
+                    secondary={item.family === "codex" ? "Codex" : "Claude"}
+                  />
+                </span>
+              </DataCell>
+              <DataCell muted>
+                <span
+                  className="block min-w-40 text-xs"
+                  title={
+                    item.usage
+                      ? `Checked ${new Date(item.usage.checkedAt).toLocaleString()}`
+                      : "Usage is unavailable"
+                  }
+                >
+                  5h {percent(item.usage?.fiveHour)} · Week {percent(item.usage?.weekly)}
+                  {item.family === "claude" && ` · Fable ${percent(item.usage?.fable)}`}
+                </span>
+              </DataCell>
+              <DataCell align="end">
+                {snapshot.canManage && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => void remove(item.id)}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </DataCell>
             </DataRow>
           ))}
         </DataTable>
@@ -116,23 +198,91 @@ export function ProvidersPage() {
       {snapshot?.canManage && (
         <Section title="Add subscription">
           <form onSubmit={(event) => void submit(event)} className="grid max-w-xl gap-4">
-            <FormField id="provider-family" label="Provider">{(control) => <select {...control} value={family} onChange={(event) => setFamily(event.target.value === "claude" ? "claude" : "codex")} className="h-9 rounded-md border bg-background px-3 text-sm"><option value="codex">Codex CLI</option><option value="claude">Claude CLI</option></select>}</FormField>
-            <FormField id="provider-label" label="Account name" kind="text" name="label" value={label} onChange={setLabel} required maxLength={100} />
+            <FormField id="provider-family" label="Provider">
+              {(control) => (
+                <select
+                  {...control}
+                  value={family}
+                  onChange={(event) =>
+                    setFamily(event.target.value === "claude" ? "claude" : "codex")
+                  }
+                  className="h-9 rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="codex">Codex CLI</option>
+                  <option value="claude">Claude CLI</option>
+                </select>
+              )}
+            </FormField>
+            <FormField
+              id="provider-label"
+              label="Account name"
+              kind="text"
+              name="label"
+              value={label}
+              onChange={setLabel}
+              required
+              maxLength={100}
+            />
             {family === "codex" ? (
-              <FormField id="codex-auth" label="Codex auth.json" description="Select the auth.json from a signed-in Codex CLI. The browser uploads it to this Hub.">{(control) => <Input {...control} type="file" accept=".json,application/json" onChange={(event) => setCodexFile(event.target.files?.[0])} />}</FormField>
+              <FormField
+                id="codex-auth"
+                label="Codex auth.json"
+                description="Select the auth.json from a signed-in Codex CLI. The browser uploads it to this Hub."
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={(event) => setCodexFile(event.target.files?.[0])}
+                  />
+                )}
+              </FormField>
             ) : (
-              <FormField id="claude-token" label="Claude setup token" description="Create one with claude setup-token." kind="secret" name="credential" value={claudeToken} onChange={setClaudeToken} required />
+              <FormField
+                id="claude-token"
+                label="Claude setup token"
+                description="Create one with claude setup-token."
+                kind="secret"
+                name="credential"
+                value={claudeToken}
+                onChange={setClaudeToken}
+                required
+              />
             )}
-            <Button type="submit" disabled={busy}>Add account</Button>
+            <Button type="submit" disabled={busy}>
+              Add account
+            </Button>
           </form>
         </Section>
       )}
-      <Section title="Connected Paseo plugins" description="Sign in from the Router page in Paseo with your Google account. Revoke daemon access here when no longer needed.">
+      <Section
+        title="Connected Paseo plugins"
+        description="Sign in from the Router page in Paseo with your Google account. Revoke daemon access here when no longer needed."
+      >
         <div className="grid max-w-xl gap-3">
-          {snapshot?.tokens.every((item) => item.revokedAt !== null) && <p className="text-sm text-muted-foreground">No connected plugins yet.</p>}
-          {snapshot?.tokens.filter((item) => item.revokedAt === null).map((item) => (
-            <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border p-3 text-sm"><span>Created {new Date(item.createdAt).toLocaleDateString()}</span><Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void revokeToken(item.id)}>Revoke</Button></div>
-          ))}
+          {snapshot?.tokens.every((item) => item.revokedAt !== null) && (
+            <p className="text-sm text-muted-foreground">No connected plugins yet.</p>
+          )}
+          {snapshot?.tokens
+            .filter((item) => item.revokedAt === null)
+            .map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between gap-3 rounded-xl border p-3 text-sm"
+              >
+                <span>Created {new Date(item.createdAt).toLocaleDateString()}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => void revokeToken(item.id)}
+                >
+                  Revoke
+                </Button>
+              </div>
+            ))}
         </div>
       </Section>
     </div>
@@ -141,4 +291,8 @@ export function ProvidersPage() {
 
 function message(error: unknown) {
   return error instanceof Error ? error.message : "The request failed.";
+}
+
+function percent(window: { usedPercent: number } | null | undefined): string {
+  return window === null || window === undefined ? "—" : `${Math.round(window.usedPercent)}%`;
 }

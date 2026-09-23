@@ -12,8 +12,11 @@ export const Route = createFileRoute("/_shell/plugin-login")({
 
 function PluginLogin() {
   const account = useActiveAccount();
-  const [code] = useState(() => typeof window === "undefined"
-    ? undefined : new URLSearchParams(window.location.search).get("code") ?? undefined);
+  const [code] = useState(() =>
+    typeof window === "undefined"
+      ? undefined
+      : (new URLSearchParams(window.location.search).get("code") ?? undefined),
+  );
   const [outcome, setOutcome] = useState<"approved" | "denied">();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -24,7 +27,8 @@ function PluginLogin() {
     setError(undefined);
     try {
       const response = await fetch("/api/provider-subscriptions/device/decision", {
-        method: "POST", credentials: "same-origin",
+        method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userCode: code, decision }),
       });
@@ -45,12 +49,32 @@ function PluginLogin() {
   } else {
     content = (
       <div className="grid gap-5">
-        <p>Request code: <strong>{code}</strong>. Approve only if this matches the code in your Paseo Router.</p>
-        <p>The daemon will be able to read and use the shared Codex and Claude subscriptions in <strong>{account.organization.name}</strong>. You can revoke its access on Providers.</p>
-        {error && <p role="alert" className="text-destructive">{error}</p>}
+        <p>
+          Request code: <span className="text-foreground">{code}</span>. Approve only if this
+          matches the code in your Paseo Router.
+        </p>
+        <p>
+          The daemon will be able to read and use the shared Codex and Claude subscriptions in{" "}
+          <span className="text-foreground">{account.organization.name}</span>. You can revoke its
+          access on Providers.
+        </p>
+        {error && (
+          <p role="alert" className="text-destructive">
+            {error}
+          </p>
+        )}
         <div className="flex gap-3">
-          <Button type="button" variant="outline" disabled={busy} onClick={() => void decide("deny")}>Deny</Button>
-          <Button type="button" disabled={busy} onClick={() => void decide("approve")}>Approve plugin login</Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void decide("deny")}
+          >
+            Deny
+          </Button>
+          <Button type="button" disabled={busy} onClick={() => void decide("approve")}>
+            Approve plugin login
+          </Button>
         </div>
       </div>
     );
@@ -58,8 +82,11 @@ function PluginLogin() {
 
   return (
     <div className="mx-auto w-full max-w-lg">
-      <AuthCard titleId="plugin-login-heading" title="Paseo plugin login"
-        description="Connect a Paseo daemon to your Google account in this Hub workspace.">
+      <AuthCard
+        titleId="plugin-login-heading"
+        title="Paseo plugin login"
+        description="Connect a Paseo daemon to your Google account in this Hub workspace."
+      >
         {content}
       </AuthCard>
     </div>

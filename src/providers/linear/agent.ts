@@ -39,7 +39,18 @@ export class LinearAgents {
       hubOrganizationId: connection.organizationId,
     });
     // Acknowledge independently so an offline daemon cannot delay another issue's ten-second deadline.
-    if (event.sessionId && (event.action === "created" || event.action === "prompted")) {
+    const cancelledAt = event.sessionId
+      ? await this.options.database.linearAgents.cancelledAt(
+          connection.id,
+          event.issueId,
+          event.sessionId,
+        )
+      : undefined;
+    if (
+      event.sessionId &&
+      (event.action === "created" || event.action === "prompted") &&
+      (!cancelledAt || Date.parse(event.createdAt) > Date.parse(cancelledAt))
+    ) {
       const ack = this.activity(
         event.organizationId,
         event.sessionId,

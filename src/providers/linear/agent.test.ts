@@ -270,6 +270,7 @@ describe("native Linear agents", () => {
     await f.deliver(sessionEvent());
     await f.agents.tick();
     assert.equal(f.creates(), 0);
+    assert.equal(f.activities.size, 0);
     await f.deliver({ ...sessionEvent(), oauthClientId: "other-app" });
     assert.equal((await f.database.linearAgents.pending()).length, 0);
     await f.agents.stop();

@@ -13,6 +13,7 @@ const MAX_TIMESTAMP_SKEW_MS = 60_000;
 
 export interface LinearWebhookSourceOptions {
   signingSecret: string;
+  acceptAgentEvent?(payload: unknown): Promise<boolean>;
   now?: () => number;
   canHydrateIssue?(linearOrganizationId: string): Promise<boolean>;
   resolveIssue?(input: {
@@ -109,6 +110,8 @@ async function handoffLinearEvent(
   options: LinearWebhookSourceOptions,
 ): Promise<Response> {
   try {
+    if (await options.acceptAgentEvent?.(verified.payload))
+      return new Response("OK", { status: 200 });
     let event = normalizeLinearEvent(verified.payload, verified.eventName);
     if (event === undefined) {
       logger.info({ deliveryId: verified.deliveryId }, "ignoring unsupported Linear event");

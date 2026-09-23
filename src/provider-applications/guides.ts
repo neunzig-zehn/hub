@@ -600,12 +600,16 @@ export const LINEAR_GUIDE: ProviderGuide = {
         },
         {
           segments: [
-            { kind: "text", value: "Create Issue and Comment webhooks using this " },
+            {
+              kind: "text",
+              value:
+                "Enable Issue, Comment, Agent session events, and Inbox notifications webhooks using this ",
+            },
             { kind: "term", value: "Webhook URL" },
             { kind: "text", value: " and a signing secret you will paste below:" },
           ],
           urls: ["events"],
-          events: ["Issue", "Comment"],
+          events: ["Issue", "Comment", "Agent session events", "Inbox notifications"],
         },
         {
           segments: [

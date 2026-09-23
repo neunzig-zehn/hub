@@ -154,6 +154,63 @@ export function createMemoryDatabase(options: MemoryDatabaseOptions = {}): Datab
 }
 
 class MemoryDatabase implements Database {
+  private readonly linearEvents = new Map<
+    string,
+    {
+      connectionId: string;
+      event: import("../providers/linear/agent-events.js").LinearAgentEvent;
+      completed: boolean;
+    }
+  >();
+  private readonly linearSessions = new Map<
+    string,
+    import("../providers/linear/agent-store.js").LinearAgentSession
+  >();
+  readonly linearAgents: import("../providers/linear/agent-store.js").LinearAgentStore = {
+    enqueue: async (connectionId, event) => {
+      const key = JSON.stringify([connectionId, event.key]);
+      if (!this.linearEvents.has(key))
+        this.linearEvents.set(key, {
+          connectionId,
+          event: structuredClone(event),
+          completed: false,
+        });
+    },
+    pending: async () =>
+      structuredClone(
+        [...this.linearEvents.values()].filter((item) => !item.completed).slice(0, 50),
+      ),
+    complete: async (connectionId, key) => {
+      const item = this.linearEvents.get(JSON.stringify([connectionId, key]));
+      if (item) item.completed = true;
+    },
+    cancelledAt: async (connectionId, issueId, sessionId) =>
+      [...this.linearEvents.values()]
+        .filter(
+          (item) =>
+            item.connectionId === connectionId &&
+            item.event.issueId === issueId &&
+            (item.event.action === "unassigned" ||
+              (item.event.action === "stop" && item.event.sessionId === sessionId)),
+        )
+        .map((item) => item.event.createdAt)
+        .sort((a, b) => Date.parse(b) - Date.parse(a))[0],
+    session: async (connectionId, id) =>
+      structuredClone(this.linearSessions.get(JSON.stringify([connectionId, id]))),
+    sessions: async () =>
+      structuredClone(
+        [...this.linearSessions.values()].filter(
+          (item) => item.status === "running" || item.status === "stopping" || item.output,
+        ),
+      ),
+    save: async (session) => {
+      this.linearSessions.set(
+        JSON.stringify([session.connectionId, session.id]),
+        structuredClone(session),
+      );
+    },
+  };
+
   // This test double has no background work. Scheduling tests use the actual embedded/PG runtime.
   get schedules(): import("../triggers/schedule/index.js").ScheduleStore {
     return (

@@ -1150,6 +1150,7 @@ export interface TerminateMachineFields {
 }
 
 export interface Database {
+  readonly linearAgents: import("../providers/linear/agent-store.js").LinearAgentStore;
   readonly executionAuthority: import("../execution-authority/index.js").ExecutionAuthorityStore;
   readonly schedules: import("../triggers/schedule/index.js").ScheduleStore;
   findAgentSessionByKey(

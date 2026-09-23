@@ -12,6 +12,9 @@ import type {
 import type { SlackDeliveryStatus } from "../triggers/slack/source/index.js";
 
 export interface TriggerProviderResources {
+  connectionForDaemon?: (
+    daemonId: string,
+  ) => import("../daemons/protocol.js").DaemonConnection | undefined;
   configurationStoreForProject: (projectId: string) => ProjectConfigurationStore;
   connectionsForProject: (projectId: string) => ConnectionResolver;
   attachments?: AttachmentCapabilityRegistry;

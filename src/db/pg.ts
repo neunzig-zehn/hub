@@ -1,3 +1,4 @@
+import { LinearAgentRepository } from "../providers/linear/agent-store.js";
 import { ExecutionAuthorityRepository } from "../execution-authority/index.js";
 import { ScheduleRepository } from "../triggers/schedule/index.js";
 import { acceptWorkflowRun } from "./workflow-intake.js";
@@ -134,6 +135,7 @@ export function createDatabase(runtime: DatabaseRuntime, locks: Locks): Database
 }
 
 class PgDatabase implements Database {
+  readonly linearAgents;
   readonly schedules;
   readonly executionAuthority;
   private readonly connections;
@@ -143,6 +145,7 @@ class PgDatabase implements Database {
     private readonly pool: DatabaseRuntime,
     private readonly locks: Locks,
   ) {
+    this.linearAgents = new LinearAgentRepository(this.pool);
     this.schedules = new ScheduleRepository(this.pool);
     this.executionAuthority = new ExecutionAuthorityRepository(this.pool);
     const database = this.pool.drizzle();

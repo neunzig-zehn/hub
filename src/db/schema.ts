@@ -1495,3 +1495,32 @@ export const executionCredentialLeases = pgTable(
   },
   (table) => [index("execution_credential_leases_execution_idx").on(table.executionId)],
 );
+
+export const linearAgentEvents = pgTable(
+  "linear_agent_events",
+  {
+    connectionId: uuid("connection_id")
+      .notNull()
+      .references(() => linearConnections.id, { onDelete: "cascade" }),
+    eventKey: text("event_key").notNull(),
+    issueId: text("issue_id").notNull(),
+    data: jsonb().notNull(),
+    completed: boolean().notNull().default(false),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("linear_agent_events_key").on(table.connectionId, table.eventKey),
+    index("linear_agent_events_pending").on(table.completed, table.receivedAt),
+    index("linear_agent_events_issue").on(table.connectionId, table.issueId),
+  ],
+);
+
+export const linearAgentSessions = pgTable(
+  "linear_agent_sessions",
+  {
+    connectionId: uuid("connection_id").notNull(),
+    id: text().notNull(),
+    data: jsonb().notNull(),
+  },
+  (table) => [uniqueIndex("linear_agent_sessions_key").on(table.connectionId, table.id)],
+);

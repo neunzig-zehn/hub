@@ -2,7 +2,12 @@ import { z } from "zod";
 import type { Database, LinearConnectionRecord } from "../../db/types.js";
 
 /** The minimum authority required to read issues and leave an outcome on the issue. */
-export const LINEAR_REQUIRED_SCOPES = ["read", "comments:create"] as const;
+export const LINEAR_REQUIRED_SCOPES = [
+  "read",
+  "comments:create",
+  "app:mentionable",
+  "app:assignable",
+] as const;
 
 /** Keep an issue description plus its preceding discussion within one bounded context window. */
 export const LINEAR_ISSUE_CONTEXT_LIMIT = 50;
@@ -147,6 +152,13 @@ export interface LinearApiClient {
     issueId: string;
     beforeCreatedAt: string;
   }): Promise<LinearIssueCommentHistory>;
+  createAgentActivity(input: {
+    linearOrganizationId: string;
+    agentSessionId: string;
+    id: string;
+    type: "thought" | "response" | "error" | "elicitation";
+    body: string;
+  }): Promise<void>;
   createComment(input: {
     linearOrganizationId: string;
     issueId: string;
@@ -389,6 +401,44 @@ export function createLinearApiClient(options: {
         complete: !result.data.comments.pageInfo.hasPreviousPage,
       };
     },
+    async createAgentActivity(input) {
+      const token = await accessTokenFor(input.linearOrganizationId);
+      try {
+        z.object({
+          data: z.object({ agentActivityCreate: z.object({ success: z.literal(true) }) }),
+        }).parse(
+          await graphql(request, token, {
+            query: `mutation PaseoAgentActivity($input: AgentActivityCreateInput!) {
+              agentActivityCreate(input: $input) { success }
+            }`,
+            variables: {
+              input: {
+                id: input.id,
+                agentSessionId: input.agentSessionId,
+                content: { type: input.type, body: input.body },
+              },
+            },
+          }),
+        );
+      } catch (error) {
+        // A response can be lost after Linear commits. Verify the stable activity ID before retrying.
+        const existing = await graphql(request, token, {
+          query: `query PaseoAgentActivityReceipt($id: String!) { agentActivity(id: $id) { id agentSession { id } } }`,
+          variables: { id: input.id },
+        }).catch(() => undefined);
+        const receipt = z
+          .object({
+            data: z.object({
+              agentActivity: z.object({
+                id: z.literal(input.id),
+                agentSession: z.object({ id: z.literal(input.agentSessionId) }),
+              }),
+            }),
+          })
+          .safeParse(existing);
+        if (!receipt.success) throw error;
+      }
+    },
     async createComment(input) {
       const result = CommentResponseSchema.parse(
         await graphql(request, await accessTokenFor(input.linearOrganizationId), {
@@ -456,7 +506,7 @@ async function readViewer(request: typeof fetch, accessToken: string) {
 async function graphql(
   request: typeof fetch,
   accessToken: string,
-  payload: { query: string; variables: Record<string, string> },
+  payload: { query: string; variables: Record<string, unknown> },
 ): Promise<unknown> {
   const response = await request("https://api.linear.app/graphql", {
     method: "POST",

@@ -133,6 +133,8 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
       ? []
       : (options.providerFactories ?? []).map((factory) =>
           factory({
+            connectionForDaemon: (daemonId) =>
+              options.daemonConnectionForId?.(daemonId) ?? daemons?.connection(daemonId),
             configurationStoreForProject: storeForProject,
             connectionsForProject:
               options.connectionsForProject ??

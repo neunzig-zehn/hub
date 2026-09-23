@@ -29,7 +29,7 @@ describe("Linear connection client", () => {
             access_token: "access-token",
             refresh_token: "refresh-token",
             expires_in: 3600,
-            scope: "read,comments:create",
+            scope: "read,comments:create,app:mentionable,app:assignable",
           });
         }
         return json({
@@ -44,7 +44,10 @@ describe("Linear connection client", () => {
       authorization.searchParams.get("redirect_uri"),
       "https://hub.test/api/integrations/linear/callback",
     );
-    assert.equal(authorization.searchParams.get("scope"), "read,comments:create");
+    assert.equal(
+      authorization.searchParams.get("scope"),
+      "read,comments:create,app:mentionable,app:assignable",
+    );
     assert.equal(authorization.searchParams.get("actor"), "app");
     assert.equal(authorization.searchParams.get("state"), "state-value");
 
@@ -55,7 +58,7 @@ describe("Linear connection client", () => {
       accessToken: "access-token",
       refreshToken: "refresh-token",
       accessTokenExpiresAt: new Date(1_700_003_600_000),
-      scopes: ["comments:create", "read"],
+      scopes: ["app:assignable", "app:mentionable", "comments:create", "read"],
     });
     assert.match(requests[0]?.body ?? "", /code=code-value/u);
   });
@@ -77,7 +80,12 @@ describe("Linear connection client", () => {
 
     const installation = await client.exchangeCode("code-value");
 
-    assert.deepEqual(installation.scopes, ["read", "comments:create"]);
+    assert.deepEqual(installation.scopes, [
+      "read",
+      "comments:create",
+      "app:mentionable",
+      "app:assignable",
+    ]);
   });
 
   it("reads a bounded, chronological history before the triggering comment", async () => {
@@ -93,7 +101,7 @@ describe("Linear connection client", () => {
       accessToken: "access-token",
       refreshToken: "refresh-token",
       accessTokenExpiresAt: null,
-      scopes: ["comments:create", "read"],
+      scopes: ["app:assignable", "app:mentionable", "comments:create", "read"],
     };
     const api = createLinearApiClient({
       connectionForLinearOrganization: async () => connection,
@@ -176,7 +184,7 @@ describe("Linear connection client", () => {
       accessToken: "expired-token",
       refreshToken: "refresh-token",
       accessTokenExpiresAt: new Date(1_700_000_000_000),
-      scopes: ["comments:create", "read"],
+      scopes: ["app:assignable", "app:mentionable", "comments:create", "read"],
     };
     const updateTokens = async (update: UpdateLinearConnectionTokensInput) => {
       updates.push(update);
@@ -189,7 +197,7 @@ describe("Linear connection client", () => {
           accessToken: "fresh-token",
           refreshToken: "next-refresh-token",
           accessTokenExpiresAt: new Date(1_700_003_600_000),
-          scopes: ["comments:create", "read"],
+          scopes: ["app:assignable", "app:mentionable", "comments:create", "read"],
         }),
       },
       now: () => new Date(1_700_000_010_000),
@@ -214,7 +222,7 @@ describe("Linear connection client", () => {
         accessToken: "fresh-token",
         refreshToken: "next-refresh-token",
         accessTokenExpiresAt: new Date(1_700_003_600_000),
-        scopes: ["comments:create", "read"],
+        scopes: ["app:assignable", "app:mentionable", "comments:create", "read"],
       },
     ]);
     assert.equal(requests[0]?.authorization, "Bearer fresh-token");
@@ -235,7 +243,7 @@ describe("Linear connection client", () => {
       accessToken: "expired-token",
       refreshToken: "refresh-token",
       accessTokenExpiresAt: new Date(1_700_000_000_000),
-      scopes: ["comments:create", "read"],
+      scopes: ["app:assignable", "app:mentionable", "comments:create", "read"],
     };
     const request: typeof fetch = async (url) => {
       if (readableUrl(url).endsWith("/oauth/token")) {
@@ -299,7 +307,7 @@ describe("Linear connection client", () => {
       accessToken: "expired-token",
       refreshToken: "refresh-token",
       accessTokenExpiresAt: new Date(1_700_000_000_000),
-      scopes: ["comments:create", "read"],
+      scopes: ["app:assignable", "app:mentionable", "comments:create", "read"],
     };
     const updates: unknown[] = [];
     const requests: string[] = [];
@@ -382,7 +390,7 @@ describe("Linear connection client", () => {
       accessToken: "expired-token",
       refreshToken: "rotating-refresh-token",
       accessTokenExpiresAt: new Date(1_700_000_000_000),
-      scopes: ["comments:create", "read"],
+      scopes: ["app:assignable", "app:mentionable", "comments:create", "read"],
     };
     const updates: unknown[] = [];
     const requests: string[] = [];
@@ -486,7 +494,10 @@ describe("Linear connection client", () => {
   });
 
   it("requires read access and the narrow comment-creation scope", () => {
-    assert.equal(hasRequiredLinearScopes(["read", "comments:create"]), true);
+    assert.equal(
+      hasRequiredLinearScopes(["read", "comments:create", "app:mentionable", "app:assignable"]),
+      true,
+    );
     assert.equal(hasRequiredLinearScopes(["read"]), false);
   });
 });

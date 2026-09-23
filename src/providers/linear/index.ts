@@ -1,3 +1,4 @@
+import { LinearAgents } from "./agent.js";
 import type { AuthServer } from "../../auth/server.js";
 import {
   CONNECTION_ATTEMPT_LIFETIME_MINUTES,
@@ -116,7 +117,11 @@ export function createLinearRegistration(
             providerApplicationId: configuration.clientId,
             providerConfigurationVersion: options.configurationVersion ?? 0,
           });
+  const agents = createNativeAgents(database, api, configuration.clientId, options.environment);
   const webhook = createLinearWebhookSource({
+    ...(agents === undefined
+      ? {}
+      : { acceptAgentEvent: (payload: unknown) => agents.accept(payload) }),
     signingSecret: configuration.webhookSecret,
     accept,
     ...(database === null
@@ -167,13 +172,15 @@ export function createLinearRegistration(
     },
     connection,
     triggerProviders: [
-      ({ configurationStoreForProject }) =>
-        createLinearTriggerProvider({
+      ({ configurationStoreForProject, connectionForDaemon }) => {
+        if (agents && connectionForDaemon) agents.connectionForDaemon = connectionForDaemon;
+        return createLinearTriggerProvider({
           configurationStoreForProject,
           ...(api === undefined ? {} : { client: api }),
-        }),
+        });
+      },
     ],
-    sources: [webhook],
+    sources: [webhook, ...(agents === undefined ? [] : [agents])],
     outputs:
       api === undefined
         ? []
@@ -399,4 +406,15 @@ function linearStatus(configured: boolean, bindings: readonly LinearConnectionRe
   return bindings.some((binding) => linearConnectionRequiresReauthorization(binding))
     ? { status: "requiresReauthorization" as const }
     : { status: "connected" as const };
+}
+
+function createNativeAgents(
+  database: Database | null,
+  api: LinearApiClient | undefined,
+  clientId: string,
+  environment: NodeJS.ProcessEnv = process.env,
+) {
+  return database === null || api === undefined
+    ? undefined
+    : new LinearAgents({ database, api, clientId, environment });
 }

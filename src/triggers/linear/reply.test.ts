@@ -41,7 +41,10 @@ describe("Linear reply output", () => {
   });
 });
 
-class RecordingLinearClient implements LinearApiClient {
+class RecordingLinearClient implements Pick<
+  LinearApiClient,
+  "readIssue" | "readIssueComments" | "createComment"
+> {
   comments: Array<{ linearOrganizationId: string; issueId: string; body: string }> = [];
 
   async readIssue(): Promise<undefined> {

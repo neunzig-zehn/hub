@@ -333,7 +333,7 @@ class BrowserLinearConnections implements LinearConnectionClient {
       accessToken: "linear-token",
       refreshToken: "linear-refresh-token",
       accessTokenExpiresAt: null,
-      scopes: ["read", "comments:create"],
+      scopes: ["read", "comments:create", "app:mentionable", "app:assignable", "write"],
     });
   }
 

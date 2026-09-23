@@ -8,7 +8,9 @@ interrupts that agent. The human assignee stays unchanged.
 Configure the Linear application to deliver **Agent session events** and **Inbox notifications**
 to `/api/integrations/linear/events`. Keep Issue and Comment events enabled if you also use
 ordinary Hub triggers. Reconnect the workspace from Connections to grant `app:mentionable` and
-`app:assignable`, in addition to `read` and `comments:create`, with `actor=app`.
+`app:assignable`, in addition to `read`, `comments:create`, and `write`, with `actor=app`.
+Linear requires `write` for Agent Activity updates; comment-only access cannot start a session.
+Pending sessions remain queued during reauthorization and resume once access is granted.
 
 The operator must explicitly configure the execution target:
 

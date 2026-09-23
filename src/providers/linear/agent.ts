@@ -47,6 +47,7 @@ export class LinearAgents {
         )
       : undefined;
     if (
+      !linearConnectionRequiresReauthorization(connection) &&
       event.sessionId &&
       (event.action === "created" || event.action === "prompted") &&
       (!cancelledAt || Date.parse(event.createdAt) > Date.parse(cancelledAt))
@@ -107,8 +108,11 @@ export class LinearAgents {
           if (
             connection?.id === connectionId &&
             connection.organizationId === event.hubOrganizationId
-          )
+          ) {
+            // Keep accepted sessions queued while the operator grants missing scopes.
+            if (linearConnectionRequiresReauthorization(connection)) return;
             await this.handle(connection, event);
+          }
           await db.linearAgents.complete(connectionId, event.key);
         });
       } catch (error) {
@@ -136,8 +140,7 @@ export class LinearAgents {
   ): Promise<LinearConnectionRecord | undefined> {
     const connection = await this.options.database.findLinearConnection(organizationId);
     return connection?.appUserId === appUserId &&
-      connection.providerApplicationId === this.options.clientId &&
-      !linearConnectionRequiresReauthorization(connection)
+      connection.providerApplicationId === this.options.clientId
       ? connection
       : undefined;
   }

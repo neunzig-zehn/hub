@@ -142,6 +142,12 @@ function fixture() {
     online: () => {
       online = true;
     },
+    removeWriteScope: () => {
+      authority!.scopes = authority!.scopes.filter((scope) => scope !== "write");
+    },
+    grantWriteScope: () => {
+      authority!.scopes.push("write");
+    },
     revoke: () => {
       authority = undefined;
     },
@@ -199,6 +205,22 @@ function unassign(offset = 1000) {
 }
 
 describe("native Linear agents", () => {
+  it("keeps native sessions queued until Agent Activity write access is granted", async () => {
+    const f = fixture();
+    f.removeWriteScope();
+    await f.deliver(sessionEvent());
+    await f.agents.tick();
+    assert.equal(f.creates(), 0);
+    assert.equal(f.activities.size, 0);
+    assert.equal((await f.database.linearAgents.pending()).length, 1);
+    f.grantWriteScope();
+    await f.agents.tick();
+    assert.equal(f.creates(), 1);
+    assert.equal(f.sent.size, 1);
+    assert.equal((await f.database.linearAgents.pending()).length, 0);
+    await f.agents.stop();
+  });
+
   it("verifies webhooks, deduplicates assignment/mention, continues comments, and returns the final response", async () => {
     const f = fixture();
     assert.equal((await f.deliver(sessionEvent(), false)).status, 401);

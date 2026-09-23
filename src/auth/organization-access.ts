@@ -97,6 +97,7 @@ interface OrganizationAccessOptions {
   sessions: AccountSessionReader;
   baseURL: string;
   policy: InstanceAuthPolicy;
+  authMode?: "password" | "google";
   /** Decides whether a signed-out visitor sees the first-run welcome or ordinary sign-in. */
   instanceSetup: InstanceSetup;
   appOnboarding: InstanceAppOnboarding;
@@ -257,6 +258,7 @@ export class OrganizationAccess {
       return Response.json({
         status: "signedOut",
         registration: this.options.policy.registrationMode,
+        ...(this.options.authMode === "google" ? { authMode: "google" } : {}),
         ...(invitation === undefined ? {} : { invitation: invitationSummary(invitation, true) }),
         ...(invitationId !== null && invitation === undefined
           ? { invitationUnavailable: true }

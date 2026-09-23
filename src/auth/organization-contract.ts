@@ -52,6 +52,7 @@ export const accountStateSchema = z.discriminatedUnion("status", [
   z.object({
     status: z.literal("signedOut"),
     registration: z.enum(REGISTRATION_MODES),
+    authMode: z.literal("google").optional(),
     invitation: invitationSchema.optional(),
     invitationUnavailable: z.literal(true).optional(),
   }),

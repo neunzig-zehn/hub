@@ -196,12 +196,41 @@ function createProductionAuthServer(
   invitationMailer: ReturnType<typeof createInvitationMailer> | undefined,
   accountMailer: ReturnType<typeof createAccountMailer> | undefined,
 ) {
+  const authMode = process.env["PASEO_AUTH_MODE"];
+  if (authMode !== undefined && authMode !== "google") {
+    throw new Error("PASEO_AUTH_MODE must be google when set");
+  }
+  const google =
+    authMode === "google"
+      ? {
+          clientId: process.env["GOOGLE_CLIENT_ID"],
+          clientSecret: process.env["GOOGLE_CLIENT_SECRET"],
+          organizationSlug: process.env["PASEO_GOOGLE_ORGANIZATION_SLUG"],
+        }
+      : undefined;
+  if (
+    google !== undefined &&
+    (!google.clientId || !google.clientSecret || !google.organizationSlug)
+  ) {
+    throw new Error(
+      "Google sign-in requires GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and PASEO_GOOGLE_ORGANIZATION_SLUG",
+    );
+  }
   return createAuthServer({
     database,
     locks,
     entitlements: entitlements.service,
     secret: identity.authSecret,
     baseURL: identity.appUrl,
+    ...(google === undefined
+      ? {}
+      : {
+          google: {
+            clientId: google.clientId!,
+            clientSecret: google.clientSecret!,
+            organizationSlug: google.organizationSlug!,
+          },
+        }),
     policy: authPolicy,
     ...(trustedClientIpHeader === undefined ? {} : { trustedClientIpHeader }),
     ...(invitationMailer === undefined ? {} : { invitationMailer }),

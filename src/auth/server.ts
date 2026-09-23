@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { randomUUID } from "node:crypto";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { z } from "zod";
@@ -82,6 +83,7 @@ export interface AuthServerOptions {
   entitlements: EntitlementsService;
   secret: string;
   baseURL: string;
+  google?: { clientId: string; clientSecret: string; organizationSlug: string };
   policy?: InstanceAuthPolicy;
   trustedClientIpHeader?: string;
   /** How a new organization is provisioned. Defaults to unlimited (self-hosted); the composition
@@ -128,6 +130,7 @@ const RAW_PRODUCT_PATHS = new Set([
 ]);
 
 export function createAuthServer(options: AuthServerOptions): AuthServer {
+  const google = options.google;
   const database = options.database.drizzle();
   const policy = options.policy ?? defaultInstanceAuthPolicy();
   const provisioningEntitlements =
@@ -166,7 +169,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
         }),
     database: drizzleAdapter(database, { provider: "pg", schema: authSchema }),
     emailAndPassword: {
-      enabled: true,
+      enabled: google === undefined,
       minPasswordLength: PASSWORD_MIN_LENGTH,
       requireEmailVerification: accountMailer !== undefined,
       revokeSessionsOnPasswordReset: true,
@@ -174,6 +177,26 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
         ? {}
         : { sendResetPassword: (email) => accountMailer.sendPasswordReset(email) }),
     },
+    ...(google === undefined
+      ? {}
+      : {
+          socialProviders: {
+            google: {
+              clientId: google.clientId,
+              clientSecret: google.clientSecret,
+              hd: "9010.berlin",
+              mapProfileToUser: (profile: { email: string; email_verified: boolean }) => {
+                if (
+                  !profile.email_verified ||
+                  !profile.email.toLowerCase().endsWith("@9010.berlin")
+                ) {
+                  throw new Error("Google account is not a verified @9010.berlin account");
+                }
+                return {};
+              },
+            },
+          },
+        }),
     ...(accountMailer === undefined
       ? {}
       : {
@@ -209,13 +232,41 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       const value = await auth.api.getSession({ headers });
       const parsed = sessionSchema.safeParse(value);
       if (!parsed.success) return undefined;
+      let activeOrganizationId = parsed.data.session.activeOrganizationId ?? null;
+      if (google !== undefined) {
+        if (!parsed.data.user.email.toLowerCase().endsWith("@9010.berlin")) return undefined;
+        const linked = await options.database.query(
+          `select 1 from account where user_id = $1 and provider_id = 'google' limit 1`,
+          [parsed.data.user.id],
+        );
+        if (linked.rowCount === 0) return undefined;
+        if (activeOrganizationId === null) {
+          const organization = await options.database.query<{ id: string }>(
+            `select id from organization where slug = $1`,
+            [google.organizationSlug],
+          );
+          const organizationId = organization.rows[0]?.id;
+          if (organizationId === undefined) throw new Error("Google sign-in organization missing");
+          await options.database.query(
+            `insert into member (id, organization_id, user_id, role)
+             values ($1, $2, $3, 'member')
+             on conflict (organization_id, user_id) do nothing`,
+            [randomUUID(), organizationId, parsed.data.user.id],
+          );
+          await options.database.query(
+            `update session set active_organization_id = $1 where id = $2 and user_id = $3 and active_organization_id is null`,
+            [organizationId, parsed.data.session.id, parsed.data.user.id],
+          );
+          activeOrganizationId = organizationId;
+        }
+      }
       return {
         sessionId: parsed.data.session.id,
         userId: parsed.data.user.id,
         name: parsed.data.user.name,
         email: parsed.data.user.email,
-        activeOrganizationId: parsed.data.session.activeOrganizationId ?? null,
-        mustChangePassword: parsed.data.user.mustChangePassword ?? false,
+        activeOrganizationId,
+        mustChangePassword: google === undefined && (parsed.data.user.mustChangePassword ?? false),
         isInstanceOperator: parsed.data.user.isInstanceOperator ?? false,
       };
     },
@@ -226,6 +277,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     sessions,
     baseURL: options.baseURL,
     policy,
+    authMode: google === undefined ? "password" : "google",
     apiKeys,
     cliCredentials,
     entitlements: options.entitlements,
@@ -247,6 +299,19 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
   return {
     handle(request) {
       const path = new URL(request.url).pathname;
+      if (google !== undefined) {
+        if (
+          path === "/api/auth/sign-in/social" ||
+          path === "/api/auth/callback/google" ||
+          path === "/api/auth/get-session" ||
+          path === "/api/auth/sign-out"
+        ) {
+          return auth.handler(request);
+        }
+        if (!path.startsWith("/api/auth/paseo/")) {
+          return Promise.resolve(Response.json({ error: "not_found" }, { status: 404 }));
+        }
+      }
       if (path.startsWith("/api/auth/paseo/")) {
         const rejected = rejectCrossOriginCookieMutation(
           request,
@@ -369,7 +434,18 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     resolveAccount: (request) => access.account(request),
     rejectCookieMutation: (request) =>
       rejectCrossOriginCookieMutation(request, requestBrowserOrigin(request, browserOrigin)),
-    initialize: () => instanceSetup.initializeFromPolicy(),
+    async initialize() {
+      await instanceSetup.initializeFromPolicy();
+      if (google !== undefined) {
+        const organization = await options.database.query(
+          `select 1 from organization where slug = $1`,
+          [google.organizationSlug],
+        );
+        if (organization.rowCount === 0) {
+          throw new Error("Google sign-in requires an existing organization");
+        }
+      }
+    },
     apiKeys,
     cliCredentials,
     publicCredentials,

@@ -2,6 +2,7 @@ import { ChevronRight, Plus } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { createAuthClient } from "better-auth/client";
 import { AuthCard, AuthLayout } from "../components/app/auth-layout.js";
 import { AuthForm } from "../components/app/auth-form.js";
 import { failureMessage } from "../components/app/failure-alert.js";
@@ -40,6 +41,60 @@ type OrganizationAccount = Extract<AccountState, { status: "organizationRequired
  * screen at a time. Stacking both forms made the card taller than the viewport.
  */
 export function AccountEntry({ account }: { account: AccountState & { status: "signedOut" } }) {
+  if (account.authMode === "google") return <GoogleAccountEntry />;
+  return <PasswordAccountEntry account={account} />;
+}
+
+function GoogleAccountEntry() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const callbackError =
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("error");
+
+  const signInWithGoogle = useCallback(async () => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const result = await createAuthClient().signIn.social({
+        provider: "google",
+        callbackURL: window.location.origin + "/",
+        errorCallbackURL: window.location.origin + "/",
+      });
+      if (result.error) setError("Google sign-in failed. Use a 90/10 Workspace account.");
+    } catch {
+      setError("Google sign-in failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+  const startGoogleSignIn = useCallback(() => {
+    void signInWithGoogle();
+  }, [signInWithGoogle]);
+
+  return (
+    <AuthLayout>
+      <AuthCard
+        titleId="account-entry-heading"
+        title="Sign in to Paseo Hub"
+        description="Use your 90/10 Google Workspace account."
+      >
+        <ErrorSummary
+          message={
+            error ??
+            (callbackError === null
+              ? undefined
+              : "Google sign-in failed. Use a 90/10 Workspace account.")
+          }
+        />
+        <Button type="button" disabled={busy} onClick={startGoogleSignIn}>
+          {busy ? "Connecting…" : "Continue with Google"}
+        </Button>
+      </AuthCard>
+    </AuthLayout>
+  );
+}
+
+function PasswordAccountEntry({ account }: { account: AccountState & { status: "signedOut" } }) {
   const invitationContext = account.invitation !== undefined;
   const invitationId = account.invitation?.id;
   const invitationSignInRequested = readInvitationSignInRequest();

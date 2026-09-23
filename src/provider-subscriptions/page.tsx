@@ -39,6 +39,8 @@ const EMPTY_TABLE = {
   title: "No subscriptions",
   description: "Add a Codex or Claude subscription to offer it to the workspace.",
 };
+const CODEX_LOGO = new URL("./logos/openai-white.svg", import.meta.url).href;
+const CLAUDE_LOGO = new URL("./logos/claude.svg", import.meta.url).href;
 
 export function ProvidersPage() {
   const { organization } = useRouteTenant();
@@ -151,13 +153,9 @@ export function ProvidersPage() {
               <DataCell>
                 <span className="flex items-center gap-3">
                   {item.family === "codex" ? (
-                    <img
-                      src="/provider-logos/openai-white.svg"
-                      alt=""
-                      className="size-5 shrink-0"
-                    />
+                    <img src={CODEX_LOGO} alt="" className="size-5 shrink-0" />
                   ) : (
-                    <img src="/provider-logos/claude.svg" alt="" className="size-5 shrink-0" />
+                    <img src={CLAUDE_LOGO} alt="" className="size-5 shrink-0" />
                   )}
                   <TwoLine
                     primary={item.label}

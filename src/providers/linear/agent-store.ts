@@ -17,6 +17,7 @@ export interface LinearAgentSession {
   lastEventAt: string;
   lastEventKey: string;
   response: string;
+  responseMessageId?: string;
   output: { id: string; type: "response" | "error" | "elicitation"; body: string } | null;
 }
 export interface LinearAgentStore {

@@ -203,6 +203,7 @@ export class LinearAgents {
       session.lastEventAt = event.createdAt;
       session.lastEventKey = event.key;
       session.response = "";
+      delete session.responseMessageId;
       session.output = null;
       await store.save(session);
     }
@@ -370,10 +371,14 @@ export class LinearAgents {
   private async watch(session: LinearAgentSession, connection: DaemonConnection): Promise<void> {
     if (this.watchers.get(session.id)?.connection === connection || !session.agentId) return;
     this.unwatch(session);
+    let pending = Promise.resolve();
     const stop = await connection.agents.watch(session.agentId, (event) => {
-      const task = this.onEvent(session, event).catch((error) => {
-        logger.error({ err: error, sessionId: session.id }, "Linear agent activity failed");
-      });
+      const task = pending
+        .then(() => this.onEvent(session, event))
+        .catch((error) => {
+          logger.error({ err: error, sessionId: session.id }, "Linear agent activity failed");
+        });
+      pending = task;
       this.callbacks.add(task);
       void task.finally(() => this.callbacks.delete(task));
     });
@@ -395,7 +400,14 @@ export class LinearAgents {
           stream.item.type === "assistant_message" &&
           stream.item.text
         ) {
-          session.response = stream.item.text.slice(-100_000);
+          const continuing =
+            stream.item.messageId !== undefined &&
+            stream.item.messageId === session.responseMessageId;
+          session.response = ((continuing ? session.response : "") + stream.item.text).slice(
+            -100_000,
+          );
+          if (stream.item.messageId) session.responseMessageId = stream.item.messageId;
+          else delete session.responseMessageId;
         } else if (
           stream.type === "turn_completed" ||
           stream.type === "turn_failed" ||

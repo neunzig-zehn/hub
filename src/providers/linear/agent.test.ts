@@ -238,7 +238,12 @@ describe("native Linear agents", () => {
     await f.emit({
       type: "timeline",
       provider: "codex",
-      item: { type: "assistant_message", text: "Fixed and tested." },
+      item: { type: "assistant_message", messageId: "answer", text: "Fixed " },
+    });
+    await f.emit({
+      type: "timeline",
+      provider: "codex",
+      item: { type: "assistant_message", messageId: "answer", text: "and tested." },
     });
     await f.emit({ type: "turn_completed", provider: "codex" });
     await f.agents.tick();

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AuthServer } from "../auth/server.js";
 import { ProductRequestError } from "../auth/organization-access.js";
 import type { DatabaseRuntime, QueryRow } from "../db/runtime/index.js";
+import { INTERNAL_CLIENT_ADDRESS_HEADER } from "../http/client-address.js";
 import { decryptCredential, encryptCredential, providerCredentialKey } from "./crypto.js";
 
 const subscriptionInput = z.object({
@@ -11,6 +12,9 @@ const subscriptionInput = z.object({
   credential: z.string().min(1).max(100_000),
 });
 const idInput = z.object({ id: z.string().uuid() });
+const deviceInput = z.object({ deviceCode: z.string().min(32).max(100) });
+const decisionInput = z.object({ userCode: z.string().min(1).max(40), decision: z.enum(["approve", "deny"]) });
+const DEVICE_LIFETIME_MINUTES = 10;
 
 interface SubscriptionRow extends QueryRow {
   id: string;
@@ -25,6 +29,17 @@ interface TokenRow extends QueryRow {
   id: string;
   created_at: Date;
   revoked_at: Date | null;
+}
+
+interface DeviceRow extends QueryRow {
+  id: string;
+  status: "pending" | "approved" | "denied" | "disclosed";
+  poll_interval_seconds: number;
+  next_poll_at: Date;
+  expires_at: Date;
+  database_now: Date;
+  organization_id: string | null;
+  user_id: string | null;
 }
 
 /** Credentials are handed only to a Google-authenticated member or their scoped plugin token. */
@@ -141,6 +156,139 @@ export class ProviderSubscriptions {
     }, row.encrypted_credential) });
   }
 
+  async deviceStart(request: Request): Promise<Response> {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+    const deviceCode = randomBytes(32).toString("base64url");
+    const userCode = randomBytes(8).toString("hex").toUpperCase().replace(/(.{4})(?=.)/gu, "$1-");
+    const fingerprint = hash(request.headers.get(INTERNAL_CLIENT_ADDRESS_HEADER) ?? "unknown");
+    const created = await this.database.transaction(async (tx) => {
+      // ponytail: approximate capacity cap; use an advisory lock if concurrent abuse appears.
+      const count = await tx.query<{ total: number; per_client: number }>(
+        `select count(*)::integer as total,
+                count(*) filter (where fingerprint_verifier = $1)::integer as per_client
+         from provider_device_authorizations
+         where status in ('pending', 'approved') and expires_at > now()`,
+        [fingerprint],
+      );
+      if (count.rows[0]!.total >= 1000 || count.rows[0]!.per_client >= 5) return false;
+      await tx.query(
+        `insert into provider_device_authorizations
+           (id, device_verifier, user_code_verifier, fingerprint_verifier, status, expires_at)
+         values ($1, $2, $3, $4, 'pending', now() + interval '10 minutes')`,
+        [randomUUID(), hash(deviceCode), hash(normalizeCode(userCode)), fingerprint],
+      );
+      return true;
+    });
+    if (!created) return json({ error: "retry_later", interval: 5 }, 429);
+    const verificationUriComplete = new URL("/plugin-login", request.url);
+    verificationUriComplete.searchParams.set("code", userCode);
+    return json({ deviceCode, userCode, verificationUriComplete: verificationUriComplete.toString(),
+      interval: 5, expiresIn: DEVICE_LIFETIME_MINUTES * 60 }, 201);
+  }
+
+  async deviceDecide(request: Request): Promise<Response> {
+    const rejected = this.auth.rejectCookieMutation(request);
+    if (rejected !== undefined) return rejected;
+    let access: Awaited<ReturnType<AuthServer["resolveOrganizationAccess"]>>;
+    try {
+      access = await this.auth.resolveOrganizationAccess(request);
+    } catch (error) {
+      if (error instanceof ProductRequestError) return error.response();
+      throw error;
+    }
+    let input: unknown;
+    try { input = await boundedJson(request); }
+    catch (error) {
+      if (error instanceof SyntaxError || error instanceof RangeError) return json({ error: "invalid_request" }, 400);
+      throw error;
+    }
+    const body = decisionInput.safeParse(input);
+    if (!body.success) return json({ error: "invalid_request" }, 400);
+    const outcome = await this.database.transaction(async (tx) => {
+      const selected = await tx.query<DeviceRow>(
+        `select *, now() as database_now from provider_device_authorizations
+         where user_code_verifier = $1 for update`,
+        [hash(normalizeCode(body.data.userCode))],
+      );
+      const row = selected.rows[0];
+      if (row === undefined || row.status !== "pending" || row.expires_at <= row.database_now) return "unavailable";
+      const authority = await tx.query(
+        `select 1 from session join member on member.id = $3
+           and member.user_id = session.user_id and member.organization_id = session.active_organization_id
+         where session.id = $1 and session.user_id = $2
+           and session.active_organization_id = $4 and session.expires_at > now()
+           and member.role in ('owner', 'admin', 'member')
+         for update of session, member`,
+        [access.session.id, access.account.id, access.membership.id, access.organization.id],
+      );
+      if (authority.rowCount !== 1) return "forbidden";
+      await tx.query(
+        `update provider_device_authorizations set status = $2,
+           organization_id = case when $2 = 'approved' then $3 else null end,
+           user_id = case when $2 = 'approved' then $4 else null end
+         where id = $1`,
+        [row.id, body.data.decision === "approve" ? "approved" : "denied", access.organization.id, access.account.id],
+      );
+      return body.data.decision === "approve" ? "approved" : "denied";
+    });
+    if (outcome === "unavailable") return json({ error: "authorization_unavailable" }, 404);
+    if (outcome === "forbidden") return json({ error: "forbidden" }, 403);
+    return json({ status: outcome });
+  }
+
+  async devicePoll(request: Request): Promise<Response> {
+    let input: unknown;
+    try { input = await boundedJson(request); }
+    catch (error) {
+      if (error instanceof SyntaxError || error instanceof RangeError) return json({ error: "invalid_request" }, 400);
+      throw error;
+    }
+    const body = deviceInput.safeParse(input);
+    if (!body.success) return json({ error: "invalid_request" }, 400);
+    const credential = `paseo_plugin_${createHash("sha256").update("paseo-plugin-device\0").update(body.data.deviceCode).digest("base64url")}`;
+    const outcome = await this.database.transaction(async (tx) => {
+      const selected = await tx.query<DeviceRow>(
+        `select *, now() as database_now from provider_device_authorizations
+         where device_verifier = $1 for update`,
+        [hash(body.data.deviceCode)],
+      );
+      const row = selected.rows[0];
+      if (row === undefined || row.expires_at <= row.database_now) return { status: "expired" };
+      if (row.status === "denied" || row.status === "disclosed") return { status: row.status };
+      if (row.next_poll_at > row.database_now) {
+        const interval = row.poll_interval_seconds + 5;
+        await tx.query(
+          `update provider_device_authorizations set poll_interval_seconds = $2,
+             next_poll_at = now() + ($2 * interval '1 second') where id = $1`,
+          [row.id, interval],
+        );
+        return { status: "slow_down", interval };
+      }
+      await tx.query(
+        `update provider_device_authorizations set next_poll_at = now() + (poll_interval_seconds * interval '1 second') where id = $1`,
+        [row.id],
+      );
+      if (row.status !== "approved") return { status: "pending", interval: row.poll_interval_seconds };
+      const membership = await tx.query(
+        `select 1 from member where organization_id = $1 and user_id = $2
+           and role in ('owner', 'admin', 'member') for update`,
+        [row.organization_id, row.user_id],
+      );
+      if (membership.rowCount !== 1) {
+        await tx.query(`update provider_device_authorizations set status = 'denied' where id = $1`, [row.id]);
+        return { status: "denied" };
+      }
+      await tx.query(
+        `insert into provider_plugin_tokens (id, organization_id, user_id, verifier)
+         values ($1, $2, $3, $4)`,
+        [randomUUID(), row.organization_id, row.user_id, hash(credential)],
+      );
+      await tx.query(`update provider_device_authorizations set status = 'disclosed' where id = $1`, [row.id]);
+      return { status: "authorized", credential };
+    });
+    return json(outcome);
+  }
+
   private async list(organizationId: string) {
     const result = await this.database.query<SubscriptionRow>(
       `select id, organization_id, family, label, encrypted_credential, created_at
@@ -181,6 +329,10 @@ function tokenView(row: TokenRow) {
 
 function hash(value: string): string {
   return createHash("sha256").update(value).digest("base64url");
+}
+
+function normalizeCode(value: string): string {
+  return value.normalize("NFKC").toUpperCase().replace(/[^A-F0-9]/gu, "");
 }
 
 function json(body: unknown, status = 200): Response {

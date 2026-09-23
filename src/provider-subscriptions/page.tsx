@@ -25,7 +25,6 @@ export function ProvidersPage() {
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
-  const [issuedToken, setIssuedToken] = useState<string>();
   const [family, setFamily] = useState<"codex" | "claude">("codex");
   const [label, setLabel] = useState("");
   const [claudeToken, setClaudeToken] = useState("");
@@ -86,20 +85,6 @@ export function ProvidersPage() {
     }
   }
 
-  async function issueToken() {
-    setBusy(true);
-    setError(undefined);
-    try {
-      const result = z.object({ token: z.string() }).parse(await send(tokenEndpoint, "POST", {}));
-      setIssuedToken(result.token);
-      await load();
-    } catch (cause) {
-      setError(message(cause));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function revokeToken(id: string) {
     setBusy(true);
     setError(undefined);
@@ -142,10 +127,9 @@ export function ProvidersPage() {
           </form>
         </Section>
       )}
-      <Section title="Connect your Paseo plugin" description="Create a token while signed into this Google account, then enter it in the Router page on your own daemon. Each token can be revoked here.">
+      <Section title="Connected Paseo plugins" description="Sign in from the Router page in Paseo with your Google account. Revoke daemon access here when no longer needed.">
         <div className="grid max-w-xl gap-3">
-          <Button type="button" variant="outline" disabled={busy} onClick={() => void issueToken()}>Create plugin token</Button>
-          {issuedToken && <div className="grid gap-2"><label htmlFor="issued-plugin-token" className="text-sm">Copy this token now. It will not be shown again.</label><Input id="issued-plugin-token" value={issuedToken} readOnly onFocus={(event) => event.currentTarget.select()} /></div>}
+          {snapshot?.tokens.every((item) => item.revokedAt !== null) && <p className="text-sm text-muted-foreground">No connected plugins yet.</p>}
           {snapshot?.tokens.filter((item) => item.revokedAt === null).map((item) => (
             <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border p-3 text-sm"><span>Created {new Date(item.createdAt).toLocaleDateString()}</span><Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void revokeToken(item.id)}>Revoke</Button></div>
           ))}

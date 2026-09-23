@@ -727,6 +727,27 @@ export const providerPluginTokens = pgTable(
   (table) => [index("provider_plugin_tokens_user_idx").on(table.userId, table.createdAt.desc())],
 );
 
+export const providerDeviceAuthorizations = pgTable(
+  "provider_device_authorizations",
+  {
+    id: uuid().primaryKey(),
+    deviceVerifier: text("device_verifier").notNull().unique(),
+    userCodeVerifier: text("user_code_verifier").notNull().unique(),
+    fingerprintVerifier: text("fingerprint_verifier").notNull(),
+    status: text().$type<"pending" | "approved" | "denied" | "disclosed">().notNull(),
+    pollIntervalSeconds: integer("poll_interval_seconds").notNull().default(5),
+    nextPollAt: timestamp("next_poll_at", { withTimezone: true }).defaultNow().notNull(),
+    organizationId: text("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("provider_device_authorizations_active_idx").on(table.status, table.expiresAt),
+    index("provider_device_authorizations_fingerprint_idx").on(table.fingerprintVerifier, table.expiresAt),
+  ],
+);
+
 export const agentSessions = pgTable(
   "agent_sessions",
   {

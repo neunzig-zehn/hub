@@ -21,6 +21,7 @@ import { Route as ApiReferenceRouteImport } from './routes/api/reference'
 import { Route as ApiOpenapiDotjsonRouteImport } from './routes/api/openapi[.]json'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as ShellTriggersRouteImport } from './routes/_shell/triggers'
+import { Route as ShellPluginLoginRouteImport } from './routes/_shell/plugin-login'
 import { Route as ShellOperatorRouteImport } from './routes/_shell/operator'
 import { Route as ShellConnectionsRouteImport } from './routes/_shell/connections'
 import { Route as ShellCliLoginRouteImport } from './routes/_shell/cli-login'
@@ -30,6 +31,7 @@ import { Route as ApiV1CliAuthorizationsRouteImport } from './routes/api/v1/cli-
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as ApiProviderSubscriptionsTokenRouteImport } from './routes/api/provider-subscriptions/token'
 import { Route as ApiProviderSubscriptionsPluginRouteImport } from './routes/api/provider-subscriptions/plugin'
+import { Route as ApiProviderSubscriptionsDeviceRouteImport } from './routes/api/provider-subscriptions/device'
 import { Route as ApiDaemonsEnrollRouteImport } from './routes/api/daemons/enroll'
 import { Route as ApiDaemonsDaemonIdRouteImport } from './routes/api/daemons/$daemonId'
 import { Route as ApiBillingWebhookRouteImport } from './routes/api/billing/webhook'
@@ -39,6 +41,8 @@ import { Route as AgentSessionsSessionIdMcpRouteImport } from './routes/agent-se
 import { Route as AgentExecutionsExecutionIdMcpRouteImport } from './routes/agent-executions/$executionId/mcp'
 import { Route as ApiV1CliAuthorizationsPollRouteImport } from './routes/api/v1/cli-authorizations/poll'
 import { Route as ApiProviderSubscriptionsPluginSubscriptionIdRouteImport } from './routes/api/provider-subscriptions/plugin/$subscriptionId'
+import { Route as ApiProviderSubscriptionsDevicePollRouteImport } from './routes/api/provider-subscriptions/device/poll'
+import { Route as ApiProviderSubscriptionsDeviceDecisionRouteImport } from './routes/api/provider-subscriptions/device/decision'
 import { Route as ApiIntegrationsSlackEventsRouteImport } from './routes/api/integrations/slack/events'
 import { Route as ApiIntegrationsSlackCallbackRouteImport } from './routes/api/integrations/slack/callback'
 import { Route as ApiIntegrationsLinearEventsRouteImport } from './routes/api/integrations/linear/events'
@@ -120,6 +124,11 @@ const ShellTriggersRoute = ShellTriggersRouteImport.update({
   path: '/triggers',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellPluginLoginRoute = ShellPluginLoginRouteImport.update({
+  id: '/plugin-login',
+  path: '/plugin-login',
+  getParentRoute: () => ShellRoute,
+} as any)
 const ShellOperatorRoute = ShellOperatorRouteImport.update({
   id: '/operator',
   path: '/operator',
@@ -166,6 +175,12 @@ const ApiProviderSubscriptionsPluginRoute =
   ApiProviderSubscriptionsPluginRouteImport.update({
     id: '/api/provider-subscriptions/plugin',
     path: '/api/provider-subscriptions/plugin',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiProviderSubscriptionsDeviceRoute =
+  ApiProviderSubscriptionsDeviceRouteImport.update({
+    id: '/api/provider-subscriptions/device',
+    path: '/api/provider-subscriptions/device',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiDaemonsEnrollRoute = ApiDaemonsEnrollRouteImport.update({
@@ -216,6 +231,18 @@ const ApiProviderSubscriptionsPluginSubscriptionIdRoute =
     id: '/$subscriptionId',
     path: '/$subscriptionId',
     getParentRoute: () => ApiProviderSubscriptionsPluginRoute,
+  } as any)
+const ApiProviderSubscriptionsDevicePollRoute =
+  ApiProviderSubscriptionsDevicePollRouteImport.update({
+    id: '/poll',
+    path: '/poll',
+    getParentRoute: () => ApiProviderSubscriptionsDeviceRoute,
+  } as any)
+const ApiProviderSubscriptionsDeviceDecisionRoute =
+  ApiProviderSubscriptionsDeviceDecisionRouteImport.update({
+    id: '/decision',
+    path: '/decision',
+    getParentRoute: () => ApiProviderSubscriptionsDeviceRoute,
   } as any)
 const ApiIntegrationsSlackEventsRoute =
   ApiIntegrationsSlackEventsRouteImport.update({
@@ -352,6 +379,7 @@ export interface FileRoutesByFullPath {
   '/cli-login': typeof ShellCliLoginRoute
   '/connections': typeof ShellConnectionsRoute
   '/operator': typeof ShellOperatorRoute
+  '/plugin-login': typeof ShellPluginLoginRoute
   '/triggers': typeof ShellTriggersRoute
   '/api/$': typeof ApiSplatRoute
   '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
@@ -367,6 +395,7 @@ export interface FileRoutesByFullPath {
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
+  '/api/provider-subscriptions/device': typeof ApiProviderSubscriptionsDeviceRouteWithChildren
   '/api/provider-subscriptions/plugin': typeof ApiProviderSubscriptionsPluginRouteWithChildren
   '/api/provider-subscriptions/token': typeof ApiProviderSubscriptionsTokenRoute
   '/api/v1/$': typeof ApiV1SplatRoute
@@ -386,6 +415,8 @@ export interface FileRoutesByFullPath {
   '/api/integrations/linear/events': typeof ApiIntegrationsLinearEventsRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/provider-subscriptions/device/decision': typeof ApiProviderSubscriptionsDeviceDecisionRoute
+  '/api/provider-subscriptions/device/poll': typeof ApiProviderSubscriptionsDevicePollRoute
   '/api/provider-subscriptions/plugin/$subscriptionId': typeof ApiProviderSubscriptionsPluginSubscriptionIdRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/o/$organizationSlug/settings/api-keys': typeof ShellOOrganizationSlugSettingsApiKeysRoute
@@ -403,6 +434,7 @@ export interface FileRoutesByTo {
   '/cli-login': typeof ShellCliLoginRoute
   '/connections': typeof ShellConnectionsRoute
   '/operator': typeof ShellOperatorRoute
+  '/plugin-login': typeof ShellPluginLoginRoute
   '/triggers': typeof ShellTriggersRoute
   '/api/$': typeof ApiSplatRoute
   '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
@@ -419,6 +451,7 @@ export interface FileRoutesByTo {
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
+  '/api/provider-subscriptions/device': typeof ApiProviderSubscriptionsDeviceRouteWithChildren
   '/api/provider-subscriptions/plugin': typeof ApiProviderSubscriptionsPluginRouteWithChildren
   '/api/provider-subscriptions/token': typeof ApiProviderSubscriptionsTokenRoute
   '/api/v1/$': typeof ApiV1SplatRoute
@@ -436,6 +469,8 @@ export interface FileRoutesByTo {
   '/api/integrations/linear/events': typeof ApiIntegrationsLinearEventsRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/provider-subscriptions/device/decision': typeof ApiProviderSubscriptionsDeviceDecisionRoute
+  '/api/provider-subscriptions/device/poll': typeof ApiProviderSubscriptionsDevicePollRoute
   '/api/provider-subscriptions/plugin/$subscriptionId': typeof ApiProviderSubscriptionsPluginSubscriptionIdRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/o/$organizationSlug/settings/api-keys': typeof ShellOOrganizationSlugSettingsApiKeysRoute
@@ -455,6 +490,7 @@ export interface FileRoutesById {
   '/_shell/cli-login': typeof ShellCliLoginRoute
   '/_shell/connections': typeof ShellConnectionsRoute
   '/_shell/operator': typeof ShellOperatorRoute
+  '/_shell/plugin-login': typeof ShellPluginLoginRoute
   '/_shell/triggers': typeof ShellTriggersRoute
   '/api/$': typeof ApiSplatRoute
   '/api/openapi.json': typeof ApiOpenapiDotjsonRoute
@@ -471,6 +507,7 @@ export interface FileRoutesById {
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
   '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
+  '/api/provider-subscriptions/device': typeof ApiProviderSubscriptionsDeviceRouteWithChildren
   '/api/provider-subscriptions/plugin': typeof ApiProviderSubscriptionsPluginRouteWithChildren
   '/api/provider-subscriptions/token': typeof ApiProviderSubscriptionsTokenRoute
   '/api/v1/$': typeof ApiV1SplatRoute
@@ -490,6 +527,8 @@ export interface FileRoutesById {
   '/api/integrations/linear/events': typeof ApiIntegrationsLinearEventsRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/provider-subscriptions/device/decision': typeof ApiProviderSubscriptionsDeviceDecisionRoute
+  '/api/provider-subscriptions/device/poll': typeof ApiProviderSubscriptionsDevicePollRoute
   '/api/provider-subscriptions/plugin/$subscriptionId': typeof ApiProviderSubscriptionsPluginSubscriptionIdRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/_shell/o/$organizationSlug/settings/api-keys': typeof ShellOOrganizationSlugSettingsApiKeysRoute
@@ -510,6 +549,7 @@ export interface FileRouteTypes {
     | '/cli-login'
     | '/connections'
     | '/operator'
+    | '/plugin-login'
     | '/triggers'
     | '/api/$'
     | '/api/openapi.json'
@@ -525,6 +565,7 @@ export interface FileRouteTypes {
     | '/api/billing/webhook'
     | '/api/daemons/$daemonId'
     | '/api/daemons/enroll'
+    | '/api/provider-subscriptions/device'
     | '/api/provider-subscriptions/plugin'
     | '/api/provider-subscriptions/token'
     | '/api/v1/$'
@@ -544,6 +585,8 @@ export interface FileRouteTypes {
     | '/api/integrations/linear/events'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/provider-subscriptions/device/decision'
+    | '/api/provider-subscriptions/device/poll'
     | '/api/provider-subscriptions/plugin/$subscriptionId'
     | '/api/v1/cli-authorizations/poll'
     | '/o/$organizationSlug/settings/api-keys'
@@ -561,6 +604,7 @@ export interface FileRouteTypes {
     | '/cli-login'
     | '/connections'
     | '/operator'
+    | '/plugin-login'
     | '/triggers'
     | '/api/$'
     | '/api/openapi.json'
@@ -577,6 +621,7 @@ export interface FileRouteTypes {
     | '/api/billing/webhook'
     | '/api/daemons/$daemonId'
     | '/api/daemons/enroll'
+    | '/api/provider-subscriptions/device'
     | '/api/provider-subscriptions/plugin'
     | '/api/provider-subscriptions/token'
     | '/api/v1/$'
@@ -594,6 +639,8 @@ export interface FileRouteTypes {
     | '/api/integrations/linear/events'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/provider-subscriptions/device/decision'
+    | '/api/provider-subscriptions/device/poll'
     | '/api/provider-subscriptions/plugin/$subscriptionId'
     | '/api/v1/cli-authorizations/poll'
     | '/o/$organizationSlug/settings/api-keys'
@@ -612,6 +659,7 @@ export interface FileRouteTypes {
     | '/_shell/cli-login'
     | '/_shell/connections'
     | '/_shell/operator'
+    | '/_shell/plugin-login'
     | '/_shell/triggers'
     | '/api/$'
     | '/api/openapi.json'
@@ -628,6 +676,7 @@ export interface FileRouteTypes {
     | '/api/billing/webhook'
     | '/api/daemons/$daemonId'
     | '/api/daemons/enroll'
+    | '/api/provider-subscriptions/device'
     | '/api/provider-subscriptions/plugin'
     | '/api/provider-subscriptions/token'
     | '/api/v1/$'
@@ -647,6 +696,8 @@ export interface FileRouteTypes {
     | '/api/integrations/linear/events'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/provider-subscriptions/device/decision'
+    | '/api/provider-subscriptions/device/poll'
     | '/api/provider-subscriptions/plugin/$subscriptionId'
     | '/api/v1/cli-authorizations/poll'
     | '/_shell/o/$organizationSlug/settings/api-keys'
@@ -676,6 +727,7 @@ export interface RootRouteChildren {
   ApiBillingWebhookRoute: typeof ApiBillingWebhookRoute
   ApiDaemonsDaemonIdRoute: typeof ApiDaemonsDaemonIdRoute
   ApiDaemonsEnrollRoute: typeof ApiDaemonsEnrollRoute
+  ApiProviderSubscriptionsDeviceRoute: typeof ApiProviderSubscriptionsDeviceRouteWithChildren
   ApiProviderSubscriptionsPluginRoute: typeof ApiProviderSubscriptionsPluginRouteWithChildren
   ApiProviderSubscriptionsTokenRoute: typeof ApiProviderSubscriptionsTokenRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
@@ -777,6 +829,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellTriggersRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/plugin-login': {
+      id: '/_shell/plugin-login'
+      path: '/plugin-login'
+      fullPath: '/plugin-login'
+      preLoaderRoute: typeof ShellPluginLoginRouteImport
+      parentRoute: typeof ShellRoute
+    }
     '/_shell/operator': {
       id: '/_shell/operator'
       path: '/operator'
@@ -838,6 +897,13 @@ declare module '@tanstack/react-router' {
       path: '/api/provider-subscriptions/plugin'
       fullPath: '/api/provider-subscriptions/plugin'
       preLoaderRoute: typeof ApiProviderSubscriptionsPluginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/provider-subscriptions/device': {
+      id: '/api/provider-subscriptions/device'
+      path: '/api/provider-subscriptions/device'
+      fullPath: '/api/provider-subscriptions/device'
+      preLoaderRoute: typeof ApiProviderSubscriptionsDeviceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/daemons/enroll': {
@@ -902,6 +968,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/provider-subscriptions/plugin/$subscriptionId'
       preLoaderRoute: typeof ApiProviderSubscriptionsPluginSubscriptionIdRouteImport
       parentRoute: typeof ApiProviderSubscriptionsPluginRoute
+    }
+    '/api/provider-subscriptions/device/poll': {
+      id: '/api/provider-subscriptions/device/poll'
+      path: '/poll'
+      fullPath: '/api/provider-subscriptions/device/poll'
+      preLoaderRoute: typeof ApiProviderSubscriptionsDevicePollRouteImport
+      parentRoute: typeof ApiProviderSubscriptionsDeviceRoute
+    }
+    '/api/provider-subscriptions/device/decision': {
+      id: '/api/provider-subscriptions/device/decision'
+      path: '/decision'
+      fullPath: '/api/provider-subscriptions/device/decision'
+      preLoaderRoute: typeof ApiProviderSubscriptionsDeviceDecisionRouteImport
+      parentRoute: typeof ApiProviderSubscriptionsDeviceRoute
     }
     '/api/integrations/slack/events': {
       id: '/api/integrations/slack/events'
@@ -1103,6 +1183,7 @@ interface ShellRouteChildren {
   ShellCliLoginRoute: typeof ShellCliLoginRoute
   ShellConnectionsRoute: typeof ShellConnectionsRoute
   ShellOperatorRoute: typeof ShellOperatorRoute
+  ShellPluginLoginRoute: typeof ShellPluginLoginRoute
   ShellTriggersRoute: typeof ShellTriggersRoute
   ShellIndexRoute: typeof ShellIndexRoute
   ShellOOrganizationSlugActivityRoute: typeof ShellOOrganizationSlugActivityRoute
@@ -1118,6 +1199,7 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellCliLoginRoute: ShellCliLoginRoute,
   ShellConnectionsRoute: ShellConnectionsRoute,
   ShellOperatorRoute: ShellOperatorRoute,
+  ShellPluginLoginRoute: ShellPluginLoginRoute,
   ShellTriggersRoute: ShellTriggersRoute,
   ShellIndexRoute: ShellIndexRoute,
   ShellOOrganizationSlugActivityRoute: ShellOOrganizationSlugActivityRoute,
@@ -1132,6 +1214,24 @@ const ShellRouteChildren: ShellRouteChildren = {
 }
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
+
+interface ApiProviderSubscriptionsDeviceRouteChildren {
+  ApiProviderSubscriptionsDeviceDecisionRoute: typeof ApiProviderSubscriptionsDeviceDecisionRoute
+  ApiProviderSubscriptionsDevicePollRoute: typeof ApiProviderSubscriptionsDevicePollRoute
+}
+
+const ApiProviderSubscriptionsDeviceRouteChildren: ApiProviderSubscriptionsDeviceRouteChildren =
+  {
+    ApiProviderSubscriptionsDeviceDecisionRoute:
+      ApiProviderSubscriptionsDeviceDecisionRoute,
+    ApiProviderSubscriptionsDevicePollRoute:
+      ApiProviderSubscriptionsDevicePollRoute,
+  }
+
+const ApiProviderSubscriptionsDeviceRouteWithChildren =
+  ApiProviderSubscriptionsDeviceRoute._addFileChildren(
+    ApiProviderSubscriptionsDeviceRouteChildren,
+  )
 
 interface ApiProviderSubscriptionsPluginRouteChildren {
   ApiProviderSubscriptionsPluginSubscriptionIdRoute: typeof ApiProviderSubscriptionsPluginSubscriptionIdRoute
@@ -1180,6 +1280,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBillingWebhookRoute: ApiBillingWebhookRoute,
   ApiDaemonsDaemonIdRoute: ApiDaemonsDaemonIdRoute,
   ApiDaemonsEnrollRoute: ApiDaemonsEnrollRoute,
+  ApiProviderSubscriptionsDeviceRoute:
+    ApiProviderSubscriptionsDeviceRouteWithChildren,
   ApiProviderSubscriptionsPluginRoute:
     ApiProviderSubscriptionsPluginRouteWithChildren,
   ApiProviderSubscriptionsTokenRoute: ApiProviderSubscriptionsTokenRoute,

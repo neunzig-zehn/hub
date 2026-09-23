@@ -11,7 +11,7 @@ import { ProviderSubscriptions } from "./service.js";
 const ORIGIN = "https://paseo.9010.berlin";
 const schema = z.object({ subscription: z.object({ id: z.string().uuid() }) });
 
-test("plugin token reads only its workspace and stops working when membership is removed", async () => {
+test("Google-approved daemon reads only its workspace and stops when membership is removed", async () => {
   const directory = await mkdtemp(join(tmpdir(), "paseo-provider-subscriptions-"));
   const { runtime } = await embeddedDatabaseRuntime(join(directory, "database"));
   try {
@@ -29,6 +29,10 @@ test("plugin token reads only its workspace and stops working when membership is
     ]) {
       await runtime.query(`insert into member (id, organization_id, user_id, role) values ($1, $2, $3, $4)`, [id, org, user, role]);
     }
+    await runtime.query(
+      `insert into session (id, token, user_id, active_organization_id, expires_at)
+       values ('session-member-a', 'test-session-token', 'member-a', 'org-a', now() + interval '1 hour')`,
+    );
     const service = new ProviderSubscriptions(runtime, {
       resolveOrganizationAccess: async (request) => {
         const user = request.headers.get("x-test-user") ?? "";
@@ -38,7 +42,7 @@ test("plugin token reads only its workspace and stops working when membership is
           session: { id: `session-${user}` },
           account: { id: user, name: user, email: `${user}@9010.berlin` },
           organization: { id: organization, name: organization, slug: organization },
-          membership: { id: `member-${user}`, role },
+          membership: { id: user === "member-a" ? "member-a" : `member-${user}`, role },
           capabilities: capabilitiesFor(role),
         };
       },
@@ -53,11 +57,23 @@ test("plugin token reads only its workspace and stops working when membership is
     ))).json()).subscription.id;
     const ownId = await create("org-a", "owner-a");
     const otherId = await create("org-b", "owner-b");
-    const tokenResult = await service.browser(new Request(`${ORIGIN}/api/provider-subscriptions/token?organizationSlug=org-a`, {
-      method: "POST", headers: { origin: ORIGIN, "x-test-user": "member-a" }, body: "{}",
+    const start = await service.deviceStart(new Request(`${ORIGIN}/api/provider-subscriptions/device`, { method: "POST" }));
+    assert.equal(start.status, 201);
+    const { deviceCode, userCode } = z.object({ deviceCode: z.string(), userCode: z.string() }).parse(await start.json());
+    const approve = await service.deviceDecide(new Request(`${ORIGIN}/api/provider-subscriptions/device/decision`, {
+      method: "POST", headers: { origin: ORIGIN, "x-test-user": "member-a" },
+      body: JSON.stringify({ userCode, decision: "approve" }),
     }));
-    assert.equal(tokenResult.status, 201);
-    const token = z.object({ token: z.string() }).parse(await tokenResult.json()).token;
+    assert.equal(approve.status, 200);
+    const poll = await service.devicePoll(new Request(`${ORIGIN}/api/provider-subscriptions/device/poll`, {
+      method: "POST", body: JSON.stringify({ deviceCode }),
+    }));
+    const { credential: token } = z.object({ status: z.literal("authorized"), credential: z.string() }).parse(await poll.json());
+    assert.match(token, /^paseo_plugin_/u);
+    const replay = await service.devicePoll(new Request(`${ORIGIN}/api/provider-subscriptions/device/poll`, {
+      method: "POST", body: JSON.stringify({ deviceCode }),
+    }));
+    assert.equal(z.object({ status: z.string() }).parse(await replay.json()).status, "disclosed");
     const fetchCredential = (id: string) => service.plugin(new Request(`${ORIGIN}/api/provider-subscriptions/plugin/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     }), id);

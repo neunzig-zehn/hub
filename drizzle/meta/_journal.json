@@ -358,6 +358,13 @@
       "when": 1790194830376,
       "tag": "0050_volatile_ulik",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1790197558810,
+      "tag": "0051_rare_invaders",
+      "breakpoints": true
     }
   ]
 }

@@ -50,6 +50,7 @@ export class ProviderSubscriptions {
     private readonly database: DatabaseRuntime,
     private readonly auth: Pick<AuthServer, "resolveOrganizationAccess" | "rejectCookieMutation">,
     secret: string,
+    private readonly publicBaseUrl?: string,
   ) {
     this.key = providerCredentialKey(secret);
   }
@@ -180,7 +181,7 @@ export class ProviderSubscriptions {
       return true;
     });
     if (!created) return json({ error: "retry_later", interval: 5 }, 429);
-    const verificationUriComplete = new URL("/plugin-login", request.url);
+    const verificationUriComplete = new URL("/plugin-login", this.publicBaseUrl ?? request.url);
     verificationUriComplete.searchParams.set("code", userCode);
     return json({ deviceCode, userCode, verificationUriComplete: verificationUriComplete.toString(),
       interval: 5, expiresIn: DEVICE_LIFETIME_MINUTES * 60 }, 201);

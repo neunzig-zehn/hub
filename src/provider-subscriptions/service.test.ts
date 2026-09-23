@@ -48,7 +48,7 @@ test("Google-approved daemon reads only its workspace and stops when membership 
       },
       rejectCookieMutation: (request) => request.headers.get("origin") === ORIGIN
         ? undefined : Response.json({ error: "origin" }, { status: 403 }),
-    }, "test-secret-that-is-at-least-32-characters");
+    }, "test-secret-that-is-at-least-32-characters", ORIGIN);
 
     const create = async (org: string, user: string) => schema.parse(await (await service.browser(new Request(
       `${ORIGIN}/api/provider-subscriptions/?organizationSlug=${org}`,
@@ -59,7 +59,8 @@ test("Google-approved daemon reads only its workspace and stops when membership 
     const otherId = await create("org-b", "owner-b");
     const start = await service.deviceStart(new Request(`${ORIGIN}/api/provider-subscriptions/device`, { method: "POST" }));
     assert.equal(start.status, 201);
-    const { deviceCode, userCode } = z.object({ deviceCode: z.string(), userCode: z.string() }).parse(await start.json());
+    const { deviceCode, userCode, verificationUriComplete } = z.object({ deviceCode: z.string(), userCode: z.string(), verificationUriComplete: z.string() }).parse(await start.json());
+    assert.equal(new URL(verificationUriComplete).origin, ORIGIN);
     const approve = await service.deviceDecide(new Request(`${ORIGIN}/api/provider-subscriptions/device/decision`, {
       method: "POST", headers: { origin: ORIGIN, "x-test-user": "member-a" },
       body: JSON.stringify({ userCode, decision: "approve" }),

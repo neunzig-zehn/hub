@@ -156,7 +156,7 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
     const application = await createApplicationRuntime({
       database,
       auth,
-      providerSubscriptions: new ProviderSubscriptions(runtime, auth, identity.authSecret),
+      providerSubscriptions: new ProviderSubscriptions(runtime, auth, identity.authSecret, identity.appUrl),
       entitlements: entitlements.service,
       billing,
       registrations: providerRuntime.registrations(),

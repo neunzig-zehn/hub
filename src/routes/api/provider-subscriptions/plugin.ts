@@ -5,8 +5,8 @@ export const Route = createFileRoute("/api/provider-subscriptions/plugin")({
   server: {
     handlers: {
       GET: async ({ request }) =>
-        (await getApplication()).providerSubscriptions?.plugin(request)
-        ?? Response.json({ error: "unavailable" }, { status: 503 }),
+        (await getApplication()).providerSubscriptions?.plugin(request) ??
+        Response.json({ error: "unavailable" }, { status: 503 }),
     },
   },
 });

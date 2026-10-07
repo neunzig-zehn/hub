@@ -9,5 +9,11 @@ async function handle(request: Request) {
 }
 
 export const Route = createFileRoute("/api/provider-subscriptions/")({
-  server: { handlers: { GET: ({ request }) => handle(request), POST: ({ request }) => handle(request), DELETE: ({ request }) => handle(request) } },
+  server: {
+    handlers: {
+      GET: ({ request }) => handle(request),
+      POST: ({ request }) => handle(request),
+      DELETE: ({ request }) => handle(request),
+    },
+  },
 });

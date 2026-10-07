@@ -156,7 +156,12 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
     const application = await createApplicationRuntime({
       database,
       auth,
-      providerSubscriptions: new ProviderSubscriptions(runtime, auth, identity.authSecret, identity.appUrl),
+      providerSubscriptions: new ProviderSubscriptions(
+        runtime,
+        auth,
+        identity.authSecret,
+        identity.appUrl,
+      ),
       entitlements: entitlements.service,
       billing,
       registrations: providerRuntime.registrations(),
@@ -237,13 +242,12 @@ function createProductionAuthServer(
     ...(trustedClientIpHeader === undefined ? {} : { trustedClientIpHeader }),
     ...(invitationMailer === undefined ? {} : { invitationMailer }),
     ...(accountMailer === undefined ? {} : { accountMailer }),
-    // Hosted: new organizations are stamped with the Free floor, then synchronously moved onto
-    // their Stripe trial. Self-hosted keeps the unlimited default and never touches Stripe.
+    // Hosted: new organizations are stamped with the Free plan and stay on it until someone buys
+    // a plan. Self-hosted keeps the unlimited default and never touches Stripe.
     ...(billing === null
       ? {}
       : {
           provisioningEntitlements: () => billing.provisioningEntitlement(),
-          onOrganizationCreated: (event) => billing.startSignup(event),
           onMembershipChanged: (organizationId: string) => billing.reportSeatUsage(organizationId),
         }),
   });

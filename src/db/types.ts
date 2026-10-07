@@ -43,6 +43,24 @@ export interface ProviderEventReceiptSummary {
   droppedReason: string | null;
 }
 
+/** One run as an organization overview reads it: what fired, what happened, and which agent ran. */
+export interface OrganizationRunRecord {
+  id: string;
+  triggerName: string;
+  provider: ProviderEventReceiptRecord["provider"];
+  source: string;
+  status: TriggerRunRecord["status"];
+  receivedAt: Date;
+  /** The agent the dispatched launch intent named; null before dispatch or when nothing launched. */
+  agent: { provider: string; model: string | null } | null;
+}
+
+/** How many events a provider delivered that no trigger was listening for. */
+export interface UnroutedProviderEventCount {
+  provider: ProviderEventReceiptRecord["provider"];
+  count: number;
+}
+
 export interface ProviderEventRouteSnapshot {
   projectId: string;
   configurationRevisionId: string;
@@ -948,7 +966,19 @@ export interface BillingPlanMarketingFeature {
   tooltip: string | null;
 }
 
+/**
+ * The plan's own numbers, as scalars. Derived once by the catalog sync from the validated
+ * entitlement template (`src/billing/catalog-sync.ts`) so the public catalog can state what a
+ * plan includes without the template document itself ever reaching the projection. null is
+ * unlimited, matching the catalog's convention everywhere else.
+ */
+export interface BillingPlanIncluded {
+  seats: number | null;
+  executionsPerMonth: number | null;
+}
+
 export interface BillingPlanMarketing {
+  included: BillingPlanIncluded;
   features: readonly BillingPlanMarketingFeature[];
   priceTooltips: Record<BillingPlanPriceInterval, string | null>;
 }
@@ -1409,6 +1439,12 @@ export interface Database {
   ): Promise<OrganizationEntitlementsRecord>;
   listEntitlementChanges(organizationId: string, limit: number): Promise<EntitlementChangeRecord[]>;
   /**
+   * The organizations stamped from `planId` whose stamp predates the plan's current template —
+   * `plan_version` differs from `templateHash`. Stripe carries no version counter, so a content
+   * hash mismatch is what "off template" means. The catalog sync re-stamps exactly this list.
+   */
+  listOrganizationsOffPlanTemplate(planId: string, templateHash: string): Promise<string[]>;
+  /**
    * Every organization, for the instance-operator picker. Not a membership read — the operator
    * acts on organizations it does not belong to, so the caller must gate this on the operator
    * flag before invoking it.
@@ -1419,6 +1455,7 @@ export interface Database {
    * the operator flag at the caller. Undefined when no organization has that slug.
    */
   findOrganizationForOperator(slug: string): Promise<OperatorOrganizationRecord | undefined>;
+  findOrganizationSlugById(organizationId: string): Promise<string | undefined>;
   /**
    * Single atomic conditional upsert: increments `used` by `amount` and returns the new
    * row, unless doing so would exceed `limit` (when non-null), in which case it returns
@@ -1551,6 +1588,21 @@ export interface Database {
   listUnroutedProviderEventsForOrganization(
     organizationId: string,
   ): Promise<ProviderEventReceiptSummary[]>;
+  /** Newest first, every run the organization's triggers started at or after `since`. */
+  listOrganizationRunsSince(
+    organizationId: string,
+    since: Date,
+    limit: number,
+  ): Promise<OrganizationRunRecord[]>;
+  /**
+   * Events received at or after `since` that were dropped because no trigger listens for them
+   * (`no_project_route`, `no_trigger_for_source`), counted per provider. A filter that declined
+   * an event is a trigger listening, so those drops are not counted.
+   */
+  countUnroutedProviderEventsSince(
+    organizationId: string,
+    since: Date,
+  ): Promise<UnroutedProviderEventCount[]>;
   isOrganizationMember(userId: string, organizationId: string): Promise<boolean>;
   startConnectionAttempt(input: StartConnectionAttemptInput): Promise<void>;
   findConnectionAttemptConfiguration(

@@ -7,6 +7,7 @@ import {
   Bot,
   Gauge,
   History,
+  House,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
@@ -44,7 +45,7 @@ import {
   useRouteTenantStatus,
 } from "../projects/context.js";
 import { SidebarHelp } from "../auth/sidebar-help.js";
-import { TrialNotice } from "../auth/trial-notice.js";
+import { ExecutionMeter } from "../entitlements/ui/index.js";
 import { NavigationGroup, type NavigationItem } from "./navigation-group.js";
 import { SidebarIdentity } from "./sidebar-switcher.js";
 import {
@@ -86,7 +87,7 @@ export function DashboardShell({ account }: { account: ActiveAccount }) {
     mutationFn: createOrganizationCommand,
     onSuccess: (result) => {
       if (result.status === "ok" && result.data.organizationSlug !== undefined) {
-        window.location.assign(`/o/${result.data.organizationSlug}/triggers`);
+        window.location.assign(`/o/${result.data.organizationSlug}/home`);
       }
     },
   });
@@ -95,7 +96,7 @@ export function DashboardShell({ account }: { account: ActiveAccount }) {
     mutationFn: ({ input }: { input: Parameters<typeof selectOrganization>[0]; slug: string }) =>
       selectOrganizationCommand(input),
     onSuccess: (result, variables) => {
-      if (result.status === "ok") window.location.assign(`/o/${variables.slug}/triggers`);
+      if (result.status === "ok") window.location.assign(`/o/${variables.slug}/home`);
     },
   });
   const leave = useMutation({
@@ -287,7 +288,9 @@ function AppSidebar({
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
-          <TrialNotice organizationSlug={organization.slug} />
+          {/* The meter belongs to the organization the URL is in, so it waits for the tenant the
+              switchers above can show from the account alone. */}
+          {instance || tenant === undefined ? null : <ExecutionMeter />}
           <SidebarHelp />
           <SidebarMenuItem>
             <AccountMenu
@@ -319,7 +322,7 @@ function Destinations({
     return (
       <NavigationGroup
         label="Instance"
-        back={wayBack(`/o/${organization.slug}/triggers`, `Back to ${organization.name}`)}
+        back={wayBack(`/o/${organization.slug}/home`, `Back to ${organization.name}`)}
         items={INSTANCE_DESTINATIONS}
       />
     );
@@ -364,10 +367,11 @@ function destinations(base: string, sections: readonly SectionDestination[]): Na
   }));
 }
 
-// Work, then administration. Team, API keys, Usage, and Billing are configured once and read
-// occasionally, so they sit behind Settings rather than competing with the three surfaces an
-// operator opens daily.
+// Where you are, then work, then administration. Home is the landing and says what to do next;
+// Team, API keys, Usage, and Billing are configured once and read occasionally, so they sit
+// behind Settings rather than competing with the surfaces an operator opens daily.
 const ORGANIZATION_SECTIONS: readonly SectionDestination[] = [
+  { section: "home", label: "Home", icon: House },
   { section: "triggers", label: "Triggers", icon: Zap, subtree: true },
   { section: "activity", label: "Activity", icon: History },
   { section: "daemons", label: "Daemons", icon: Cpu },

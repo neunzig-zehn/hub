@@ -8,8 +8,7 @@ export const Route = createFileRoute("/api/provider-subscriptions/plugin/$subscr
         (await getApplication()).providerSubscriptions?.plugin(
           request,
           new URL(request.url).pathname.split("/").at(-1) ?? "",
-        )
-        ?? Response.json({ error: "unavailable" }, { status: 503 }),
+        ) ?? Response.json({ error: "unavailable" }, { status: 503 }),
     },
   },
 });

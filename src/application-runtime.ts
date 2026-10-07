@@ -29,6 +29,8 @@ import { TriggerDashboard } from "./triggers/dashboard.js";
 import type { ProviderApplications } from "./provider-applications/index.js";
 import { DaemonProviderCatalog } from "./daemons/provider-catalog.js";
 import type { ProviderSubscriptions } from "./provider-subscriptions/service.js";
+import { HomeDashboard } from "./home/dashboard.js";
+import type { ProviderConnectionRegistration } from "./providers/registration.js";
 
 export interface ApplicationCompositionOptions {
   database: Database | null;
@@ -149,8 +151,9 @@ async function createOwnedApplicationRuntime(
             githubConfigurations[0],
             (projectId) => application.configurationForProject(projectId),
           ),
-    triggerDashboard: triggerDashboardFor(options),
+    triggerDashboard: triggerDashboardFor(options, application.hub),
     daemonProviderCatalog: daemonProviderCatalogFor(options, application.hub),
+    homeDashboard: homeDashboardFor(options, connections),
     ...entitlementSurfaces(options),
     testTriggerRoutes: options.testTriggerRoutes ?? false,
     auth: (request) => {
@@ -343,27 +346,39 @@ async function createOwnedApplicationRuntime(
       });
       return { url: portal?.url ?? null };
     },
-    // Unlike the rest of the billing surface this one answers rather than refuses when billing is
-    // absent: the dashboard sidebar asks it on every organization, hosted or not, and "no trial"
-    // is the truthful answer on a self-hosted instance.
-    organizationTrial: async (request, organizationSlug) => {
-      const { billing, database } = options;
-      if (billing === null || database === null) return { daysLeft: null };
-      const { tenant } = await resolveRouteTenant(requireAuth(options), database, request, {
-        organizationSlug,
-      });
-      return { daysLeft: await billing.trialRemaining(tenant.organization.id) };
-    },
     providerRequest: (name, request) =>
       requests.get(name)?.(request) ?? Promise.resolve(new Response("Not Found", { status: 404 })),
     stop: () => ownership.close(),
   };
 }
 
-function triggerDashboardFor(options: ApplicationCompositionOptions): TriggerDashboard | null {
-  return options.database === null || options.auth === null
+function triggerDashboardFor(
+  options: ApplicationCompositionOptions,
+  hub: import("./app.js").HubRuntime,
+): TriggerDashboard | null {
+  return options.database === null || options.auth === null || hub.agentValidator === null
     ? null
-    : new TriggerDashboard(options.database, options.auth);
+    : new TriggerDashboard(options.database, options.auth, hub.agentValidator);
+}
+
+function homeDashboardFor(
+  options: ApplicationCompositionOptions,
+  connections: ReadonlyMap<string, ProviderConnectionRegistration>,
+): HomeDashboard | null {
+  if (options.database === null || options.auth === null) return null;
+  // The same registrations `connectionStatus` answers from: a provider whose status is anything
+  // but "not configured" has an app behind it.
+  return new HomeDashboard(options.database, options.auth, (bindings) =>
+    [...connections.values()].some((connection) => isConfigured(connection.status(bindings))),
+  );
+}
+
+function isConfigured(status: unknown): boolean {
+  return (
+    typeof status === "object" &&
+    status !== null &&
+    Reflect.get(status, "status") !== "notConfigured"
+  );
 }
 
 function daemonProviderCatalogFor(

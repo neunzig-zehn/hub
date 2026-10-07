@@ -59,6 +59,7 @@ function fixture() {
       requestId: "snapshot",
     }),
     refreshProviderSnapshot: async () => {},
+    validateAgentConfiguration: async () => ({ valid: true }),
     agents: {
       create: async () => {
         creates++;
